@@ -12,6 +12,8 @@ Single source of truth for all project standards, conventions, and architectural
 | Lock posts              | `locks.md`                                                                        |
 | Writing tests           | `component-testing.md`                                                            |
 | Making commits          | `commit-message.md`                                                               |
+| Cutting a release       | `release.md`                                                                      |
+| Cutting a hotfix        | `hotfix.md`                                                                       |
 | Architectural decisions | `adr-guidelines.md`, `adr/`                                                       |
 
 ## Documentation Files
@@ -27,6 +29,8 @@ Single source of truth for all project standards, conventions, and architectural
 | `skeleton-architecture.md` | Skeleton loader placement, naming, and testing patterns                                               |
 | `z-index.md`               | Z-index layering conventions                                                                          |
 | `commit-message.md`        | Conventional commit format                                                                            |
+| `release.md`               | Cutting a production release from `dev` onto `master`                                                 |
+| `hotfix.md`                | Cutting a production patch without taking `dev` HEAD (see `release.md` for shared steps)              |
 | `environment.md`           | Environment variable configuration                                                                    |
 | `adr-guidelines.md`        | When and how to write ADRs                                                                            |
 | `locks.md`                 | Frontend reader for lock posts — payment-gated content (creator side: ADR 0019)                       |
@@ -59,3 +63,5 @@ When making significant changes to:
 - **Error handling**: Update `error-handling.md`
 - **Testing patterns**: Update `component-testing.md`
 - **Environment variables**: Update `environment.md`
+- **Release process**: Update `release.md`
+- **Hotfix process**: Update `hotfix.md`

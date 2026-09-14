@@ -756,6 +756,8 @@ describe('AuthController', () => {
       );
       // Skip post-migration resync — new user has no homeserver data to resync
       expect(storeMocks.resetMigrationStore).toHaveBeenCalled();
+      // Settings are account-local; the previous account's document must not carry over
+      expect(storeMocks.resetSettingsStore).toHaveBeenCalled();
       expect(keypairFromSecretKeySpy).toHaveBeenCalledWith(TEST_SECRET_KEY);
       expect(signUpSpy).toHaveBeenCalledWith({
         keypair,
@@ -832,6 +834,8 @@ describe('AuthController', () => {
       );
       // Skip post-migration resync — bootstrap runs if user has profile, otherwise no data to resync
       expect(storeMocks.resetMigrationStore).toHaveBeenCalled();
+      // Settings are account-local; the previous account's document must not carry over
+      expect(storeMocks.resetSettingsStore).toHaveBeenCalled();
       expect(keypairSpy).toHaveBeenCalledWith(mnemonic);
       expect(signInSpy).toHaveBeenCalledWith({ keypair: mockKeypair });
       expect(z32FromSessionSpy).toHaveBeenCalledWith({ session: mockSession });
@@ -1081,6 +1085,8 @@ describe('AuthController', () => {
       );
       // Skip post-migration resync — full bootstrap below covers all data
       expect(storeMocks.resetMigrationStore).toHaveBeenCalled();
+      // Settings are account-local; the previous account's document must not carry over
+      expect(storeMocks.resetSettingsStore).toHaveBeenCalled();
       expect(result.authorizationUrl).toEqual(mockAuthUrl.authorizationUrl);
       expect(result.awaitApproval).toBeInstanceOf(Promise);
       expect(result.cancelAuthFlow).toBe(cancelAuthFlow);
