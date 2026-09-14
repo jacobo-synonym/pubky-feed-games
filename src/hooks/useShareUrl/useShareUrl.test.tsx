@@ -1,5 +1,6 @@
 import { renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { useIsTouchDevice } from '@/hooks/useIsTouchDevice/useIsTouchDevice';
 import { toast } from '@/molecules/Toaster/toast';
 import { useShareUrl } from './useShareUrl';
 
@@ -15,6 +16,10 @@ vi.mock('@/libs/utils/utils', async () => {
   };
 });
 
+vi.mock('@/hooks/useIsTouchDevice/useIsTouchDevice', () => ({
+  useIsTouchDevice: vi.fn(() => true),
+}));
+
 vi.mock('@/molecules/Toaster/toast');
 
 const URL = 'https://pubky.app/collections/author/0034BBBDFK83G';
@@ -29,6 +34,7 @@ describe('useShareUrl', () => {
     vi.clearAllMocks();
     mockCopyToClipboard.mockResolvedValue(undefined);
     vi.mocked(toast).mockReturnValue({ dismiss: vi.fn() });
+    vi.mocked(useIsTouchDevice).mockReturnValue(true);
     stubShareSheet(undefined, undefined);
   });
 
@@ -47,13 +53,44 @@ describe('useShareUrl', () => {
 
   it('hands the URL to the native share sheet and does not touch the clipboard', async () => {
     const share = vi.fn().mockResolvedValue(undefined);
-    stubShareSheet(share, () => true);
+    const canShare = vi.fn(() => true);
+    stubShareSheet(share, canShare);
 
     const { result } = renderHook(() => useShareUrl({ title: 'Based Bitcoin' }));
 
     await expect(result.current.shareUrl(URL)).resolves.toBe(true);
     expect(share).toHaveBeenCalledWith({ url: URL, title: 'Based Bitcoin' });
     expect(mockCopyToClipboard).not.toHaveBeenCalled();
+  });
+
+  it('checks and shares the exact same payload', async () => {
+    const share = vi.fn(async (_data: ShareData) => {});
+    const canShare = vi.fn((_data: ShareData) => true);
+    stubShareSheet(share, canShare);
+
+    const { result } = renderHook(() => useShareUrl({ title: 'Based Bitcoin' }));
+
+    await result.current.shareUrl(URL);
+
+    expect(canShare).toHaveBeenCalledTimes(1);
+    expect(share).toHaveBeenCalledTimes(1);
+    // Identity, not shape: `canShare` only answers for the payload it was given.
+    expect(canShare.mock.calls[0][0]).toBe(share.mock.calls[0][0]);
+    expect(canShare.mock.calls[0][0]).toEqual({ url: URL, title: 'Based Bitcoin' });
+  });
+
+  it('copies to the clipboard on a share-capable non-touch device', async () => {
+    const share = vi.fn(async (_data: ShareData) => {});
+    const canShare = vi.fn((_data: ShareData) => true);
+    stubShareSheet(share, canShare);
+    vi.mocked(useIsTouchDevice).mockReturnValue(false);
+
+    const { result } = renderHook(() => useShareUrl({ title: 'Based Bitcoin' }));
+
+    await expect(result.current.shareUrl(URL)).resolves.toBe(true);
+    expect(share).not.toHaveBeenCalled();
+    expect(canShare).not.toHaveBeenCalled();
+    expect(mockCopyToClipboard).toHaveBeenCalledWith({ text: URL });
   });
 
   it('omits the title from the share payload when no title is given', async () => {

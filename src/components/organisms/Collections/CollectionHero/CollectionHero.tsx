@@ -50,9 +50,10 @@ import type { CollectionHeroContentProps, CollectionHeroProps } from './Collecti
  *     + Copy link.
  *
  * `Share` reposts the collection and stays what it always was; `Copy link` is
- * the one that hands the collection URL over (native share sheet where the
- * browser offers one, clipboard otherwise), so the URL is reachable without an
- * address bar.
+ * the one that hands the collection URL over, so the URL is reachable without
+ * an address bar. It copies to the clipboard by default, because that is what
+ * its label promises and the Web Share API is not mobile-only; the native sheet
+ * is used only on touch devices (see `useShareUrl`).
  */
 export function CollectionHero({
   authorPubky,

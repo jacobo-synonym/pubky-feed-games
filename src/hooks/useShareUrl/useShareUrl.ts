@@ -1,4 +1,5 @@
 import { useCopyToClipboard } from '@/hooks/useCopyToClipboard/useCopyToClipboard';
+import { useIsTouchDevice } from '@/hooks/useIsTouchDevice/useIsTouchDevice';
 
 interface UseShareUrlOptions {
   /** Title handed to the native share sheet alongside the URL. */
@@ -10,10 +11,13 @@ interface UseShareUrlOptions {
 /**
  * Hands a URL over to the platform.
  *
- * Prefers the native share sheet when the browser exposes one: an installed PWA
- * has no address bar, so the sheet is the only way to move a link straight into
- * another app. Everywhere else, and whenever a share attempt fails for a reason
- * other than the user dismissing the sheet, it falls back to the clipboard.
+ * The clipboard is the default path: the control that calls this is labelled
+ * "Copy link", and the Web Share API is not mobile-only (desktop Safari exposes
+ * it), so preferring the sheet whenever `navigator.share` exists would open a
+ * share dialog instead of copying. The sheet is used only on touch devices,
+ * where an installed PWA has no address bar and the sheet is the only way to
+ * move a link straight into another app. A share attempt that fails for a reason
+ * other than the user dismissing the sheet falls back to the clipboard.
  */
 export function useShareUrl(options: UseShareUrlOptions = {}) {
   const {
@@ -23,11 +27,17 @@ export function useShareUrl(options: UseShareUrlOptions = {}) {
   } = options;
 
   const { copyToClipboard } = useCopyToClipboard({ successTitle, errorDescription });
+  const isTouchDevice = useIsTouchDevice();
 
   const shareUrl = async (url: string): Promise<boolean> => {
-    if (canUseNativeShare(url)) {
+    // One payload for both calls: `canShare` answers whether the equivalent
+    // `share` call would succeed, so a payload it never saw is a payload it
+    // never validated.
+    const shareData: ShareData = { url, ...(title ? { title } : {}) };
+
+    if (isTouchDevice && canUseNativeShare(shareData)) {
       try {
-        await navigator.share({ url, ...(title ? { title } : {}) });
+        await navigator.share(shareData);
         return true;
       } catch (error) {
         // Dismissing the sheet is a deliberate user action: stay silent instead
@@ -42,12 +52,12 @@ export function useShareUrl(options: UseShareUrlOptions = {}) {
   return { shareUrl };
 }
 
-function canUseNativeShare(url: string): boolean {
+function canUseNativeShare(shareData: ShareData): boolean {
   if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') return false;
   if (typeof navigator.canShare !== 'function') return true;
 
   try {
-    return navigator.canShare({ url });
+    return navigator.canShare(shareData);
   } catch {
     return false;
   }
