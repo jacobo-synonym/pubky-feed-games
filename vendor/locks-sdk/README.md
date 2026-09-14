@@ -3,8 +3,19 @@
 WASM build output of [`pubky/locks`](https://github.com/pubky/locks)
 `locks-sdk/bindings/js`, committed here because the SDK is published to no registry.
 
-Built from `pubky/locks` master with wasm-pack 0.13.1 and the repo's pinned Rust 1.91.1
-(`rust-toolchain.toml`), which already declares the `wasm32-unknown-unknown` target.
+## Provenance
+
+| | |
+|---|---|
+| Source | `pubky/locks` @ `a9d52b886a98083d6d52423b9f56f3966aefc4df` |
+| Package version | `0.1.0-rc2` |
+| Rust | `1.91.1` (the repo's pinned `rust-toolchain.toml`, which declares `wasm32-unknown-unknown`) |
+| wasm-pack | `0.13.1` |
+| Command | `wasm-pack build --target web --out-dir pkg` |
+
+The source commit is reconstructed, not recorded: the build shallow-cloned `master`, which
+pointed at `a9d52b88` then and still does. Rebuild from the pinned revision below to confirm
+it, and record the commit directly next time.
 
 `package.json` is wasm-pack's own output with one edit: `name` is `@pubky/locks-sdk` rather
 than the generated `locks-sdk-wasm`, because that is the specifier `src/` imports.
@@ -19,10 +30,15 @@ it, bun copies it, and both resolve.
 
 ## Regenerating
 
+Pin the revision and the tool. Tracking `master` or "latest wasm-pack" makes the committed
+binary unreproducible, and a binary nobody can rebuild is a binary nobody can audit.
+
 ```bash
-git clone --depth 1 https://github.com/pubky/locks
-cd locks/locks-sdk/bindings/js
-npm run build                       # wasm-pack build --target web --out-dir pkg
+git clone https://github.com/pubky/locks
+cd locks && git checkout a9d52b886a98083d6d52423b9f56f3966aefc4df
+cd locks-sdk/bindings/js
+cargo install wasm-pack --version 0.13.1 --locked
+wasm-pack build --target web --out-dir pkg
 cp pkg/locks_sdk_wasm* <pubky-app>/vendor/locks-sdk/
 ```
 
@@ -34,14 +50,16 @@ Then, in `vendor/locks-sdk/`:
    `locks-sdk-wasm` from the crate name, and the imports in `src/` would stop resolving.
 3. If `version` changed, update the `vendor/locks-sdk` entry in `package-lock.json` to match,
    or `npm ci` will refuse the lockfile.
+4. Update the provenance table above, with the commit you actually built.
 
 No Rust toolchain locally? The build runs in a container:
 
 ```bash
 docker run --rm -i rust:1.91.1-bookworm sh -c '
-  curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh >&2
-  git clone --depth 1 https://github.com/pubky/locks /src >&2
-  cd /src/locks-sdk/bindings/js && wasm-pack build --target web --out-dir pkg >&2
+  cargo install wasm-pack --version 0.13.1 --locked >&2
+  git clone https://github.com/pubky/locks /src >&2
+  cd /src && git checkout a9d52b886a98083d6d52423b9f56f3966aefc4df >&2
+  cd locks-sdk/bindings/js && wasm-pack build --target web --out-dir pkg >&2
   tar -cf - -C pkg .' > pkg.tar
 ```
 
