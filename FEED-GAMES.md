@@ -25,7 +25,7 @@ The samples are fixtures, not authored network posts. Published game posts use `
 
 Finish an authored game and choose **Reply with score**: the native Pubky reply composer opens with the result and exact game reference. Nothing posts automatically. A sample instead offers **Share challenge**, which prepares a new post because it has no original post to reply to. Scores are explicitly self-reported; there is no verified leaderboard or reward system.
 
-Sign in at https://pubky-feed-games.vercel.app/sign-in using Pubky Ring. Desktop displays its native QR flow; narrow screens offer the Ring authorization button. An existing staging identity is needed for the remaining end-to-end checks. Creating a disposable staging identity was attempted and the homeserver returned `400 Token required`. Never share recovery phrases with the agent.
+Sign in at https://pubky-feed-games.vercel.app/sign-in using Pubky Ring. Desktop displays its native QR flow; narrow screens offer the Ring authorization button. An existing staging identity was used for the single-account end-to-end checks below. Creating a disposable staging identity was attempted and the homeserver returned `400 Token required`. Never share recovery phrases with the agent.
 
 ## Where it lives
 
@@ -58,7 +58,7 @@ Use the upstream supported Node version in CI. On Node 25, use `NODE_OPTIONS=--n
 
 Automated coverage includes versioned references, malformed settings, legacy runner compatibility, deterministic/solvable decks, reaction timing rules, full sandbox memory/reaction sessions, native POST vs REPLY routing, attribution, sign-in gating, draft-preserving composer insertion and the optional Games timeline.
 
-Browser checks cover inline memory play, reaction scoring and the share flow, narrow-screen creator/settings/preview, discard protection, and the tagged Games view. Actual staging publication and cross-account reply/remix verification remain pending account access.
+Browser checks cover inline memory play, reaction scoring and the share flow, narrow-screen creator/settings/preview, discard protection, and the tagged Games view. Single-account staging publication, score replies and attributed remixes are verified below. A second-account check remains outstanding.
 
 Home and composer visual surfaces change intentionally. Their pixel baselines must be refreshed through the **VRT Update Baselines** workflow on the feature branch. The matching browser binary is not installed locally; no large browser downloads or local baseline files are added. Full checks and the hosted deployment result are recorded in the task handoff.
 
@@ -68,4 +68,16 @@ Home and composer visual surfaces change intentionally. Their pixel baselines mu
 - Repository-wide lint passed.
 - TypeScript check passed after resolving the creator prop and test harness typing; the affected arcade/studio suites were rerun: **31 tests passed**.
 - Existing runtime `1.0.0` files remain byte-for-byte unchanged.
-- No account publication or Vibes directory submission has been performed for this milestone.
+- Vibes directory submission remains on hold. Authenticated verification followed deployment; see below.
+
+### Authenticated verification (2026-09-15)
+
+After the user signed in as Swift-Wolf-Hawk, the deployed app completed this flow using its native UI:
+
+1. Published [Feed Games test · Lunch Run](https://pubky-feed-games.vercel.app/post/xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo/0035Q2T35BHX0) with the `feed-games` tag and played it directly in the feed.
+2. Posted the actual run's zero-fries [score reply](https://pubky-feed-games.vercel.app/post/xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo/0035Q2T6MBXP0). The original post's reply count became one.
+3. Published [Feed Games test · Midnight Remix](https://pubky-feed-games.vercel.app/post/xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo/0035Q2TAAH7MG), changing the world to midnight, course to 817 and style to snacks. Its attribution link opened the original post.
+4. Confirmed all three posts appear in the tagged Games view.
+5. Independently fetched all three from the public staging Nexus `/v0/post/{author}/{id}` API without browser credentials. The reply's `relationships.replied` is the original post URI; the remix preserves its source ID and changed settings.
+
+These are real, publicly indexed staging posts, not only optimistic browser-cache entries. All actions used one account; cross-account behavior has not yet been verified. The test posts remain available for review. No Vibes listing was submitted.
