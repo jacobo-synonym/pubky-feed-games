@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Home } from './Home';
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/home',
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 // Mock Organisms
 vi.mock('@/organisms/AlertBackup/AlertBackup', () => {
   return {

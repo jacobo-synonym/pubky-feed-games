@@ -9,6 +9,7 @@ import { StructuredData } from '@/molecules/StructuredData/StructuredData';
 import { Toaster } from '@/molecules/Toaster/Toaster';
 import { CoordinatorsManager } from '@/organisms/CoordinatorsManager/CoordinatorsManager';
 import { DialogSignIn } from '@/organisms/DialogSignIn/DialogSignIn';
+import { FeedGamesStudio } from '@/organisms/FeedGamesStudio/FeedGamesStudio';
 import { Header } from '@/organisms/Header/Header';
 import { DatabaseProvider } from '@/providers/DatabaseProvider/DatabaseProvider';
 import { ErrorBoundaryProvider } from '@/providers/ErrorBoundaryProvider/ErrorBoundaryProvider';
@@ -55,6 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                 <Fab />
                 <Toaster />
                 <DialogSignIn />
+                <FeedGamesStudio />
               </RouteGuardProvider>
             </DatabaseProvider>
           </ErrorBoundaryProvider>

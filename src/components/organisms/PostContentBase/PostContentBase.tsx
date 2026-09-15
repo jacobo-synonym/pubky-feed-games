@@ -70,7 +70,7 @@ export function PostContentBase({ postId, className, textClassName, mediaVariant
       {hasContent && <PostText content={postDetails.content} className={textClassName} />}
 
       {/* Link previews from text */}
-      {hasContent && <PostLinkEmbeds content={postDetails.content} />}
+      {hasContent && <PostLinkEmbeds postId={postId} content={postDetails.content} />}
 
       {/* Attachments on this post */}
       <PostAttachments

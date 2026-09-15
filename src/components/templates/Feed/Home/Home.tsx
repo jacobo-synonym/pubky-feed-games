@@ -4,6 +4,7 @@ import { useDefaultHomeReach } from '@/hooks/useDefaultHomeReach/useDefaultHomeR
 import { TaggedAsHeadline } from '@/molecules/TaggedAsHeadline/TaggedAsHeadline';
 import { AlertBackup } from '@/organisms/AlertBackup/AlertBackup';
 import { DialogWelcome } from '@/organisms/DialogWelcome/DialogWelcome';
+import { FeedGamesIntroduction } from '@/organisms/FeedGamesIntroduction/FeedGamesIntroduction';
 import { FeedNavigation } from '@/organisms/FeedNavigation/FeedNavigation';
 import { PostInput } from '@/organisms/PostInput/PostInput';
 import { POST_INPUT_VARIANT } from '@/organisms/PostInput/PostInput.constants';
@@ -23,6 +24,7 @@ export function Home() {
       {/* First child so the mobile tab bar sits directly under the compact header (Hot pattern). */}
       <FeedNavigation />
       <AlertBackup />
+      <FeedGamesIntroduction />
       <TimelineFeed variant={TIMELINE_FEED_VARIANT.HOME} persistentHeader={<TaggedAsHeadline />}>
         <PostInput dataCy="home-post-input" variant={POST_INPUT_VARIANT.POST} />
       </TimelineFeed>

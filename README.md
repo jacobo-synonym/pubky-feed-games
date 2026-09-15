@@ -1,3 +1,5 @@
+> **Feed Games experiment:** [Play the hosted vibe](https://pubky-feed-games.vercel.app/home) · [Integration and testing notes](FEED-GAMES.md). This fork adds playable game cards to Pubky posts and uses the staging network.
+
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/pubky/pubky-app)
 
 # Pubky web app
