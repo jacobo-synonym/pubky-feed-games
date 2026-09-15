@@ -37,7 +37,7 @@ git status --porcelain -- . "${EXCLUDE[@]}"                    # changed-file li
 # Branch: RANGE="origin/dev...HEAD"
 # PR #N (same repo or fork):
 #   BASE=$(gh pr view N --json baseRefName --jq .baseRefName)
-#   git fetch -q origin "$BASE" "pull/N/head:refs/remotes/origin/pr-N"
+#   git fetch -q origin "$BASE" "+pull/N/head:refs/remotes/origin/pr-N"   # + so a force-pushed PR head still updates
 #   RANGE="origin/$BASE...origin/pr-N"
 git diff "$RANGE" -- . "${EXCLUDE[@]}" > "$OUT"
 git diff --name-status "$RANGE" -- . "${EXCLUDE[@]}"           # changed-file list
