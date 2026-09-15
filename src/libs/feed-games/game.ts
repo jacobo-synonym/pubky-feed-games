@@ -2,7 +2,7 @@ import { LinkifyIt } from 'linkify-it';
 import { z } from 'zod';
 import { APP_ROUTES, POST_ROUTES } from '@/app/routes';
 
-export const GAME_REMIX_EVENT = 'pubky:remix-game';
+export const GAME_CREATE_EVENT = 'pubky:create-game';
 export const GAME_RESULT_EVENT = 'pubky:game-result';
 export const GAME_TAG = 'feed-games';
 export const GAME_PLAY_EVENT = 'pubky:play-game';

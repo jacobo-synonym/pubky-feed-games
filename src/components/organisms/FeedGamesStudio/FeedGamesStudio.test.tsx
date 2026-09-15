@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ARCADE_GAMES, GAME_REMIX_EVENT, GAME_RESULT_EVENT } from '@/libs/feed-games/game';
+import { ARCADE_GAMES, GAME_CREATE_EVENT, GAME_RESULT_EVENT } from '@/libs/feed-games/game';
 import type { PostInput } from '@/organisms/PostInput/PostInput';
 import { FeedGamesStudio } from './FeedGamesStudio';
 
@@ -49,13 +49,13 @@ describe('Feed Games native publishing', () => {
     expect(screen.getByTestId('native-composer')).toHaveAttribute('data-variant', 'post');
     expect(screen.getByTestId('native-composer')).toHaveAttribute('data-tags', 'feed-games');
   });
-  it('previews a remix before inserting it and retains attribution', async () => {
+  it('previews a configured game before inserting it', async () => {
     const insert = vi.fn();
     render(<FeedGamesStudio />);
     act(() =>
       window.dispatchEvent(
-        new CustomEvent(GAME_REMIX_EVENT, {
-          detail: { game: { ...ARCADE_GAMES[0], source: postId }, onInsert: insert },
+        new CustomEvent(GAME_CREATE_EVENT, {
+          detail: { game: ARCADE_GAMES[0], onInsert: insert },
         }),
       ),
     );
@@ -65,7 +65,7 @@ describe('Feed Games native publishing', () => {
     expect(insert).not.toHaveBeenCalled();
     expect(screen.queryByTestId('native-composer')).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Add game to post' }));
-    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ seed: 817, source: postId, version: 2 }));
+    expect(insert).toHaveBeenCalledWith(expect.objectContaining({ seed: 817, version: 2 }));
   });
   it('keeps publishing behind the native sign-in gate', () => {
     auth.isAuthenticated = false;

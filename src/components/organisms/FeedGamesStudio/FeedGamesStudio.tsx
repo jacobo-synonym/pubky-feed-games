@@ -12,7 +12,7 @@ import { useRequireAuth } from '@/hooks/useRequireAuth/useRequireAuth';
 import {
   ARCADE_GAMES,
   type FeedGame,
-  GAME_REMIX_EVENT,
+  GAME_CREATE_EVENT,
   GAME_RESULT_EVENT,
   GAME_TAG,
   gameCover,
@@ -53,10 +53,10 @@ export function FeedGamesStudio() {
         setResult(parsed.data);
       }
     };
-    window.addEventListener(GAME_REMIX_EVENT, open);
+    window.addEventListener(GAME_CREATE_EVENT, open);
     window.addEventListener(GAME_RESULT_EVENT, share);
     return () => {
-      window.removeEventListener(GAME_REMIX_EVENT, open);
+      window.removeEventListener(GAME_CREATE_EVENT, open);
       window.removeEventListener(GAME_RESULT_EVENT, share);
     };
   }, []);
@@ -92,9 +92,7 @@ function GameEditor({
     <Dialog open onOpenChange={confirm.handleOpenChange}>
       <DialogContent className="w-3xl" avoidKeyboard>
         <DialogHeader>
-          <DialogTitle>
-            {prepared ? 'Your game post' : source.source ? 'Remix this challenge' : 'Make a game post'}
-          </DialogTitle>
+          <DialogTitle>{prepared ? 'Your game post' : 'Make a game post'}</DialogTitle>
           <DialogDescription>Pick a game. Set the challenge. Let your feed play along.</DialogDescription>
         </DialogHeader>
         {!prepared ? (
@@ -187,9 +185,7 @@ function GameEditor({
                 Shuffle
               </Button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Same settings, same challenge. Remixes keep a link to their source post.
-            </p>
+            <p className="text-xs text-muted-foreground">The same settings give everyone the same challenge.</p>
             <Button type="submit">Preview game post</Button>
           </form>
         ) : (

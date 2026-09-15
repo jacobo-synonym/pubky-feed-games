@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ARCADE_GAMES, gameUrl } from '@/libs/feed-games/game';
 import { Home } from './Home';
 
 const search = vi.hoisted(() => ({ value: '' }));
@@ -154,6 +155,25 @@ describe('Home - Snapshots', () => {
     search.value = 'view=games&tags=feed-games';
     render(<Home />);
     expect(screen.getByTestId('timeline-feed')).toHaveAttribute('data-variant', 'search');
+  });
+
+  it('keeps samples hidden until requested and links to native tag search', () => {
+    render(<Home />);
+    expect(screen.queryByRole('button', { name: 'Play in feed' })).toBeNull();
+    expect(screen.queryByRole('link', { name: 'Games' })).toBeNull();
+    expect(screen.getByRole('link', { name: '#feed-games' })).toHaveAttribute('href', '/search?tags=feed-games');
+    fireEvent.click(screen.getByRole('button', { name: 'Try a game' }));
+    expect(screen.getByRole('button', { name: 'Play in feed' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Remix' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Try a game' }));
+    expect(screen.queryByRole('button', { name: 'Play in feed' })).toBeNull();
+  });
+
+  it('still opens a directly shared game without an extra discovery step', () => {
+    search.value = new URL(gameUrl(ARCADE_GAMES[1], window.location.origin)).search;
+    render(<Home />);
+    expect(screen.getByRole('heading', { name: 'Pocket Pairs' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Play in feed' })).toBeInTheDocument();
   });
 
   it('matches snapshot', () => {

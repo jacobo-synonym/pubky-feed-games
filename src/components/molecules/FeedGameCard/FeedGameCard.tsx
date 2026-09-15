@@ -1,18 +1,11 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MessageCircle, Play, RotateCcw, Shuffle, X } from 'lucide-react';
+import { MessageCircle, Play, RotateCcw, X } from 'lucide-react';
 import { POST_ROUTES } from '@/app/routes';
 import { Button } from '@/atoms/Button/Button';
 import { useFeedGamePlayer } from '@/hooks/useFeedGamePlayer/useFeedGamePlayer';
-import {
-  type FeedGame,
-  GAME_REMIX_EVENT,
-  GAME_RESULT_EVENT,
-  gameCover,
-  gamePlayer,
-  gameScore,
-} from '@/libs/feed-games/game';
+import { type FeedGame, GAME_RESULT_EVENT, gameCover, gamePlayer, gameScore } from '@/libs/feed-games/game';
 
 export function FeedGameCard({
   game,
@@ -109,7 +102,7 @@ export function FeedGameCard({
               className="text-xs text-muted-foreground underline"
               href={`${POST_ROUTES.POST}/${game.source.replace(':', '/')}`}
             >
-              Remixed from an original post
+              Original post
             </Link>
           )}
           <p className="text-xs text-muted-foreground">{`Course ${game.seed}`}</p>
@@ -119,21 +112,6 @@ export function FeedGameCard({
             <Button variant="ghost" size="sm" onClick={close}>
               <X />
               Close game
-            </Button>
-          )}
-          {!preview && (
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => {
-                close();
-                window.dispatchEvent(
-                  new CustomEvent(GAME_REMIX_EVENT, { detail: { ...game, source: postId ?? game.source } }),
-                );
-              }}
-            >
-              <Shuffle />
-              Remix
             </Button>
           )}
         </div>

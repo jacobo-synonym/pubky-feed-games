@@ -1,6 +1,6 @@
 # Feed Games — Pubky Vibe
 
-An experimental Pubky app fork with playable, remixable games **inside feed posts**.
+An experimental Pubky app fork with playable games **inside feed posts**.
 
 - Hosting: Vercel, existing Pubky staging services; no Docker or custom backend.
 - Upstream: `pubky/pubky-app`, branch `dev`.
@@ -11,15 +11,17 @@ An experimental Pubky app fork with playable, remixable games **inside feed post
 
 ## Try it
 
-Open https://pubky-feed-games.vercel.app/home. Choose a sample and **Play in feed**:
+Open https://pubky-feed-games.vercel.app/home. Open **Try a game** to reveal the samples, then choose **Play in feed**:
 
 - **Pigeon Lunch Run:** hop cones and collect fries; Space, Up, or Jump. A run lasts up to 30 seconds.
 - **Pocket Pairs:** find matching cards in as few moves as possible. Difficulty sets the number of pairs.
 - **Signal Sprint:** wait for green and tap. Early and missed taps score zero; difficulty sets the number of rounds.
 
-**Make a game** opens the creator. Pick a template, title, world, difficulty and course number; runners also have balanced, hurdles and snack trail styles. Shuffle chooses a new course number. Preview before publishing. **Remix** on an authored post retains its source link. Existing composers also have an **Add game** button: it inserts the configured challenge, preserves the draft and attachments, and does not auto-publish.
+**Create game post** inside the samples opens the creator. Pick a template, title, world, difficulty and course number; runners also have balanced, hurdles and snack trail styles. Shuffle chooses a new course number. Preview before publishing. Existing composers have an **Add game** button: it inserts the configured challenge, preserves the draft and attachments, and does not auto-publish.
 
-**All posts** preserves the normal home feed. **Games** uses Pubky's native tagged search for `feed-games`. New game and score posts start with that tag. The composer insertion adds it when there is room within Pubky's existing tag limit. Tags are editable, so this is discovery, not a verified game-only index.
+The normal feed is the default. A quiet **Try a game** disclosure provides a cold-start path without a permanent arcade banner. The **#feed-games** link uses Pubky's existing tag search. New game and score posts start with that tag; anyone can edit it, so this is discovery, not a verified game-only index. Existing `?view=games&tags=feed-games` links remain compatible, but there is no separate Games tab in the UI.
+
+The Remix action has been removed because changing preset settings did not provide meaningful creative remixing. Previously published references and their source links remain readable. Creation, play and score replies are the supported actions.
 
 The samples are fixtures, not authored network posts. Published game posts use `PostContentBase → PostLinkEmbeds → FeedGameCard`, retaining the existing author, reply, tag, repost, bookmark, deletion, and blur behavior.
 
@@ -81,3 +83,7 @@ After the user signed in as Swift-Wolf-Hawk, the deployed app completed this flo
 5. Independently fetched all three from the public staging Nexus `/v0/post/{author}/{id}` API without browser credentials. The reply's `relationships.replied` is the original post URI; the remix preserves its source ID and changed settings.
 
 These are real, publicly indexed staging posts, not only optimistic browser-cache entries. All actions used one account; cross-account behavior has not yet been verified. The test posts remain available for review. No Vibes listing was submitted.
+
+### Discovery simplification (2026-09-15)
+
+Removed Remix actions and creator remix copy, the large Feed Games heading, the arcade slogan and the All posts / Games selector. Samples are closed by default behind **Try a game**; direct shared-game links still open their player preview immediately. **#feed-games** leads to the existing native tag search. This gives an empty feed a small playable starting point while actual game posts, reposts and tags provide ongoing discovery. No additional posts were published for this UI change.

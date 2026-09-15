@@ -17,7 +17,7 @@ import { useElementHeight } from '@/hooks/useElementHeight/useElementHeight';
 import { useEnterSubmit } from '@/hooks/useEnterSubmit/useEnterSubmit';
 import { usePostInput } from '@/hooks/usePostInput/usePostInput';
 import { usePostInputAuthHandlers } from '@/hooks/usePostInputAuthHandlers/usePostInputAuthHandlers';
-import { ARCADE_GAMES, type FeedGame, GAME_REMIX_EVENT, GAME_TAG, gamePost } from '@/libs/feed-games/game';
+import { ARCADE_GAMES, type FeedGame, GAME_CREATE_EVENT, GAME_TAG, gamePost } from '@/libs/feed-games/game';
 import { getComposerDissolveVariants } from '@/libs/motion/composerMotion';
 import { parseArticleContent } from '@/libs/post/articleContent';
 import { deserializeArticleBody } from '@/libs/post/articleInlineImages';
@@ -501,7 +501,7 @@ export function PostInput({
                         FEED_GAMES_ENABLED && !hideGameButton && variant === POST_INPUT_VARIANT.POST && !isArticle
                           ? () =>
                               window.dispatchEvent(
-                                new CustomEvent(GAME_REMIX_EVENT, {
+                                new CustomEvent(GAME_CREATE_EVENT, {
                                   detail: {
                                     game: ARCADE_GAMES[0],
                                     onInsert: (game: FeedGame) => {

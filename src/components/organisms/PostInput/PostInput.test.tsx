@@ -9,7 +9,7 @@ import { useIsMobile } from '@/hooks/useIsMobile/useIsMobile';
 import type { ExistingAttachment } from '@/hooks/usePost/usePost.types';
 import { usePostInput } from '@/hooks/usePostInput/usePostInput';
 import type { UsePostInputOptions, UsePostInputReturn } from '@/hooks/usePostInput/usePostInput.types';
-import { ARCADE_GAMES, GAME_REMIX_EVENT, type GameEditorRequest } from '@/libs/feed-games/game';
+import { ARCADE_GAMES, GAME_CREATE_EVENT, type GameEditorRequest } from '@/libs/feed-games/game';
 import { PostInputAttachments } from '@/molecules/PostInputAttachments/PostInputAttachments';
 import { toast } from '@/molecules/Toaster/toast';
 import { PostHeader } from '@/organisms/PostHeader/PostHeader';
@@ -1029,11 +1029,11 @@ describe('PostInput', () => {
     const capture = (event: Event) => {
       request = (event as CustomEvent<GameEditorRequest>).detail;
     };
-    window.addEventListener(GAME_REMIX_EVENT, capture);
+    window.addEventListener(GAME_CREATE_EVENT, capture);
     render(<PostInput variant={POST_INPUT_VARIANT.POST} expanded />);
     const props = vi.mocked(PostInputActionBar).mock.calls.at(-1)?.[0];
     props?.onGameClick?.();
-    window.removeEventListener(GAME_REMIX_EVENT, capture);
+    window.removeEventListener(GAME_CREATE_EVENT, capture);
     expect(request?.onInsert).toBeDefined();
     request?.onInsert?.(ARCADE_GAMES[1]);
     const appendContent = mockSetContent.mock.calls.at(-1)?.[0];
