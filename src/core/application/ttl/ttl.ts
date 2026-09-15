@@ -99,7 +99,7 @@ export class TtlApplication {
       buildCompositeId({ pubky: post.details.author, id: post.details.id }),
     );
     await this.deferOmittedIds(uniqueIds, returnedPostIds, (id) =>
-      LocalPostService.upsertTtlWithDelay(id, getTtlRetryDelayMs()),
+      LocalPostService.upsertTtlWithDelay(id, getTtlRetryDelayMs(), { unlessWrittenSince: fetchStartedAt }),
     );
     await this.refreshTagWindows(
       postBatch.map(
@@ -139,6 +139,7 @@ export class TtlApplication {
     if (uniqueIds.length === 0) return [];
 
     const revisions = await LocalTagCacheService.captureRevisions('user', uniqueIds);
+    const fetchStartedAt = Date.now();
     const userBatch = await NexusUserStreamService.fetchByIds({
       user_ids: uniqueIds,
       force: true,
@@ -154,7 +155,7 @@ export class TtlApplication {
     if (params.isCurrent && !params.isCurrent()) return [];
     const returnedUserIds = userBatch.map((user) => user.details.id);
     await this.deferOmittedIds(uniqueIds, returnedUserIds, (id) =>
-      LocalUserService.upsertTtlWithDelay(id, getTtlRetryDelayMs()),
+      LocalUserService.upsertTtlWithDelay(id, getTtlRetryDelayMs(), { unlessWrittenSince: fetchStartedAt }),
     );
     await this.refreshTagWindows(
       userBatch.map(
@@ -198,7 +199,9 @@ export class TtlApplication {
   /**
    * An id Nexus omitted from a batch (deleted, or not indexed yet) gets no fresh TTL row and
    * would be re-flagged on every tick. Park it for the retry delay instead, so a missing entity
-   * costs one request per delay rather than one per tick.
+   * costs one request per delay rather than one per tick. The deferrer keeps rows written since
+   * the fetch started, so a cooldown never shortens freshness a local edit or another refresh
+   * just established.
    */
   private static async deferOmittedIds<T extends string>(
     requested: T[],

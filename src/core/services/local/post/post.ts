@@ -138,11 +138,25 @@ export class LocalPostService {
    * Used when Nexus omits a subscribed post (deleted, or not indexed yet) so the
    * coordinator retries it on a cooldown instead of every tick.
    *
-   * The timestamp is calculated as: now - (postTtlMs - retryDelayMs)
+   * The timestamp is calculated as: now - (postTtlMs - retryDelayMs). With
+   * `unlessWrittenSince`, a row written at or after that time (a local edit, or
+   * another successful refresh, landed while the batch was in flight) is kept, so
+   * the cooldown never shortens real freshness. The check and the write share one
+   * transaction.
    */
-  static async upsertTtlWithDelay(compositePostId: string, retryDelayMs: number): Promise<void> {
+  static async upsertTtlWithDelay(
+    compositePostId: string,
+    retryDelayMs: number,
+    options: { unlessWrittenSince?: number } = {},
+  ): Promise<void> {
     const lastUpdatedAt = Date.now() - (getTtlPostMs() - retryDelayMs);
-    await PostTtlModel.upsert({ id: compositePostId, lastUpdatedAt });
+    await db.transaction('rw', PostTtlModel.table, async () => {
+      if (options.unlessWrittenSince !== undefined) {
+        const existing = await PostTtlModel.findById(compositePostId);
+        if (existing && existing.lastUpdatedAt >= options.unlessWrittenSince) return;
+      }
+      await PostTtlModel.upsert({ id: compositePostId, lastUpdatedAt });
+    });
   }
 
   /**

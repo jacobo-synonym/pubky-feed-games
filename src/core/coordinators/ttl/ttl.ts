@@ -213,8 +213,9 @@ export class TtlCoordinator {
       this.state.postBatchQueue.clear();
       this.state.userBatchQueue.clear();
       // Signing out clears the local database and usually navigates away. Waiting one
-      // interval keeps the guest refresh from racing the clear or refetching a page the
-      // user is leaving; an account switch refreshes the new view immediately.
+      // interval avoids refetching a page the user is leaving; it is a request-saving
+      // measure, not a synchronisation with the clear, which IndexedDB already orders
+      // ahead of this tick's reads. An account switch refreshes the new view immediately.
       this.evaluateAndStartTicking(state.session === null ? this.config.batchIntervalMs : 0);
     });
 
@@ -552,7 +553,11 @@ export class TtlCoordinator {
   /**
    * Refresh stale entities in batches
    */
-  private async refreshStaleEntities<T extends string>(ops: EntityOps<T>, viewerId: Pubky | null): Promise<void> {
+  private async refreshStaleEntities<T extends string>(
+    ops: EntityOps<T>,
+    viewerId: Pubky | null,
+    isCurrent: () => boolean,
+  ): Promise<void> {
     if (ops.batchQueue.size === 0) return;
 
     // Take up to maxBatchSize entities
@@ -566,6 +571,10 @@ export class TtlCoordinator {
     // application-level guard covers writes that land while the fetch itself
     // is in flight.
     const ids = await this.filterStillStale(queuedIds, ops);
+    // The account may have changed during that read. The controller captures
+    // the session at call time, so a request carrying the previous viewer would
+    // otherwise be accepted as the new session's data.
+    if (!isCurrent()) return;
     for (const id of queuedIds) {
       if (!ids.includes(id)) ops.batchQueue.delete(id);
     }
@@ -624,6 +633,12 @@ export class TtlCoordinator {
    */
   private async onBatchTick(): Promise<void> {
     const { currentUserPubky: viewerId, session } = useAuthStore.getState();
+    // Every await below is a chance for the account to change; work captured for
+    // this viewer must not be sent or applied on behalf of the next one.
+    const isCurrent = () => {
+      const state = useAuthStore.getState();
+      return state.currentUserPubky === viewerId && state.session === session;
+    };
     const postOps = this.getPostOps();
     const userOps = this.getUserOps();
 
@@ -642,14 +657,15 @@ export class TtlCoordinator {
       userBatchQueue: this.state.userBatchQueue.size,
     });
 
-    const current = useAuthStore.getState();
-    if (current.currentUserPubky !== viewerId || current.session !== session) return;
+    if (!isCurrent()) return;
 
     // Fire batch refreshes (parallel)
-    await Promise.all([this.refreshStaleEntities(postOps, viewerId), this.refreshStaleEntities(userOps, viewerId)]);
+    await Promise.all([
+      this.refreshStaleEntities(postOps, viewerId, isCurrent),
+      this.refreshStaleEntities(userOps, viewerId, isCurrent),
+    ]);
 
-    const afterRefresh = useAuthStore.getState();
-    if (afterRefresh.currentUserPubky !== viewerId || afterRefresh.session !== session) return;
+    if (!isCurrent()) return;
     // Tag failures have their own persisted cooldown, independent of entity TTLs.
     await Promise.all([
       TtlController.refreshStaleTags({

@@ -453,7 +453,9 @@ describe('TtlApplication', () => {
 
       await TtlApplication.forceRefreshPostsByIds({ postIds });
 
-      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob:2', getTtlRetryDelayMs());
+      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob:2', getTtlRetryDelayMs(), {
+        unlessWrittenSince: expect.any(Number),
+      });
     });
 
     it('parks a user Nexus omitted for the retry delay and still reports the refreshed ones', async () => {
@@ -465,7 +467,9 @@ describe('TtlApplication', () => {
       const refreshed = await TtlApplication.forceRefreshUsersByIds({ userIds });
 
       expect(refreshed).toEqual(['alice']);
-      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob', getTtlRetryDelayMs());
+      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob', getTtlRetryDelayMs(), {
+        unlessWrittenSince: expect.any(Number),
+      });
     });
 
     it('does not park anything when the batch returned every id', async () => {

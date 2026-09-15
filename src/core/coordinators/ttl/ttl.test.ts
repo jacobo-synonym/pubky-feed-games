@@ -149,6 +149,30 @@ describe('TtlCoordinator', () => {
     );
   });
 
+  it('does not send a batch for the previous viewer when the account changes during the pre-fetch re-check', async () => {
+    setupAuthenticatedUser('user-a' as Pubky);
+    const coordinator = TtlCoordinator.getInstance();
+    coordinator.configure({ batchIntervalMs: 1_000 });
+    const postId = createCompositePostId('author1', 'post1');
+    findStalePostsSpy
+      .mockResolvedValueOnce([postId]) // subscribe-time check
+      .mockResolvedValueOnce([postId]) // tick check
+      .mockImplementationOnce(async () => {
+        // The pre-fetch re-check is an await; the account switches underneath it.
+        useAuthStore.getState().init({ session: mockSession(), currentUserPubky: 'user-b' as Pubky, hasProfile: true });
+        return [postId];
+      });
+
+    coordinator.subscribePost({ compositePostId: postId });
+    coordinator.start();
+    await waitForTick();
+
+    // The controller captures the session at call time, so a request carrying
+    // user-a's viewer id would be accepted as user-b's data. It must not go out.
+    expect(forceRefreshPostsSpy).not.toHaveBeenCalledWith(expect.objectContaining({ viewerId: 'user-a' }));
+    expect(TtlController.refreshStaleTags).not.toHaveBeenCalledWith(expect.objectContaining({ viewerId: 'user-a' }));
+  });
+
   it('leaves ids still waiting in the entity batch queue out of the tag pass', async () => {
     setupAuthenticatedUser();
     const coordinator = TtlCoordinator.getInstance();
