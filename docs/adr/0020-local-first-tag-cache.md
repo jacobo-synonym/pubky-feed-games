@@ -1,4 +1,4 @@
-# ADR 0019: Local-First Tag Cache and Viewport Lifetimes
+# ADR 0020: Local-First Tag Cache and Viewport Lifetimes
 
 ## Status
 

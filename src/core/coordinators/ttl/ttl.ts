@@ -9,6 +9,7 @@ import { TtlController } from '@/controllers/ttl/ttl';
 import { isAppError } from '@/libs/error/error.utils';
 import { Logger } from '@/libs/logger/logger';
 import type { Pubky } from '@/models/models.types';
+import { parseCompositeId } from '@/models/models.utils';
 import { useAuthStore } from '@/stores/auth/auth.store';
 import type {
   EntityOps,
@@ -36,11 +37,13 @@ import type {
  * - Posts: postRefCount Map + postBatchQueue Set
  * - Users: userRefCount Map + userBatchQueue Set
  *
- * Each visible post also owns one reference to its author, whose refresh has a separate queue.
- * User subscriptions are managed explicitly via subscribeUser/unsubscribeUser,
- * with reference counting to handle multiple subscribers to the same user.
+ * Both are reference counted so nested surfaces that track the same entity
+ * (a repost preview inside a feed, a share dialog over a hero, a profile
+ * header beside a user list) cannot unsubscribe each other: the entity stays
+ * tracked until the last subscriber leaves. Each visible post also owns one
+ * reference to its author, whose refresh has a separate queue.
  *
- * More info in the ADR: https://github.com/pubky/pubky-app/blob/dev/docs/adr/0019-local-first-tag-cache.md
+ * More info in the ADR: https://github.com/pubky/pubky-app/blob/dev/docs/adr/0020-local-first-tag-cache.md
  */
 export class TtlCoordinator {
   private static instance: TtlCoordinator | null = null;
@@ -59,8 +62,8 @@ export class TtlCoordinator {
     intervalId: null,
     isStarted: false,
     isPageVisible: true,
-    userRefCount: new Map(),
     postRefCount: new Map(),
+    userRefCount: new Map(),
     postBatchQueue: new Set(),
     userBatchQueue: new Set(),
   };
@@ -125,45 +128,21 @@ export class TtlCoordinator {
   }
 
   /**
-   * Subscribe to a post's TTL tracking
+   * Subscribe to a post's TTL tracking.
+   * The first reference to a post also holds one reference to its author.
    */
   public subscribePost({ compositePostId }: TtlSubscribePostParams): void {
-    const count = this.state.postRefCount.get(compositePostId) ?? 0;
-    this.state.postRefCount.set(compositePostId, count + 1);
-    if (count > 0) return;
-    this.subscribeUser({ pubky: compositePostId.split(':')[0] });
-
-    Logger.debug('TtlCoordinator: Post subscribed', {
-      compositePostId,
-      totalSubscribedPosts: this.state.postRefCount.size,
-    });
-
-    // Check if post is stale and queue for refresh
-    void this.checkAndQueueEntity(compositePostId, this.getPostOps());
+    if (!this.subscribe(compositePostId, this.getPostOps())) return;
+    this.subscribeUser({ pubky: parseCompositeId(compositePostId).pubky });
   }
 
   /**
-   * Unsubscribe from a post's TTL tracking
+   * Unsubscribe from a post's TTL tracking.
+   * Releasing the last reference to a post also releases its author reference.
    */
   public unsubscribePost({ compositePostId }: TtlUnsubscribePostParams): void {
-    // Safe if called multiple times or for unknown IDs
-    if (!this.hasPostSubscription(compositePostId)) {
-      Logger.debug('TtlCoordinator: Post not subscribed (skip unsubscribe)', { compositePostId });
-      return;
-    }
-
-    const count = this.state.postRefCount.get(compositePostId) ?? 0;
-    if (count > 1) {
-      this.state.postRefCount.set(compositePostId, count - 1);
-      return;
-    }
-    this.state.postRefCount.delete(compositePostId);
-    this.unsubscribeUser({ pubky: compositePostId.split(':')[0] });
-    this.removePostSubscription(compositePostId);
-    Logger.debug('TtlCoordinator: Post unsubscribed', {
-      compositePostId,
-      totalSubscribedPosts: this.state.postRefCount.size,
-    });
+    if (!this.unsubscribe(compositePostId, this.getPostOps())) return;
+    this.unsubscribeUser({ pubky: parseCompositeId(compositePostId).pubky });
   }
 
   /**
@@ -171,23 +150,14 @@ export class TtlCoordinator {
    * Use this for user profiles not associated with posts
    */
   public subscribeUser({ pubky }: TtlSubscribeUserParams): void {
-    this.addUserSubscription(pubky);
-    Logger.debug('TtlCoordinator: User subscribed', {
-      pubky,
-      totalSubscribedUsers: this.state.userRefCount.size,
-    });
-    void this.checkAndQueueEntity(pubky, this.getUserOps());
+    this.subscribe(pubky, this.getUserOps());
   }
 
   /**
    * Unsubscribe from a user's TTL tracking directly
    */
   public unsubscribeUser({ pubky }: TtlUnsubscribeUserParams): void {
-    this.removeUserSubscription(pubky);
-    Logger.debug('TtlCoordinator: User unsubscribed', {
-      pubky,
-      totalSubscribedUsers: this.state.userRefCount.size,
-    });
+    this.unsubscribe(pubky, this.getUserOps());
   }
 
   /** Bootstrap owns one temporary reference until Nexus returns the indexed user. */
@@ -229,16 +199,20 @@ export class TtlCoordinator {
    * Setup event listeners for auth state and page visibility
    */
   private setupListeners(): void {
-    // Listen to auth store changes
+    // Listen to auth store changes. Compare the snapshots directly: the store
+    // selectors read the live store, so calling one on `prevState` can never
+    // observe a transition. Subscriptions survive an account change so a public
+    // view keeps refreshing as a guest; only queued session work is discarded.
     this.authStoreUnsubscribe = useAuthStore.subscribe((state, prevState) => {
-      if (state.currentUserPubky !== prevState.currentUserPubky || state.session !== prevState.session) {
-        this.stopTicking();
-        for (const pubky of this.indexingRetries) this.unsubscribeUser({ pubky });
-        this.indexingRetries.clear();
-        this.state.postBatchQueue.clear();
-        this.state.userBatchQueue.clear();
-        this.evaluateAndStartTicking();
-      }
+      if (state.currentUserPubky === prevState.currentUserPubky && state.session === prevState.session) return;
+
+      Logger.debug('TtlCoordinator: Session changed', { signedIn: state.session !== null });
+      this.stopTicking();
+      for (const pubky of this.indexingRetries) this.unsubscribeUser({ pubky });
+      this.indexingRetries.clear();
+      this.state.postBatchQueue.clear();
+      this.state.userBatchQueue.clear();
+      this.evaluateAndStartTicking();
     });
 
     // Listen to page visibility changes
@@ -375,52 +349,86 @@ export class TtlCoordinator {
    */
   private reset(): void {
     this.indexingRetries.clear();
-    this.state.userRefCount.clear();
     this.state.postRefCount.clear();
+    this.state.userRefCount.clear();
     this.state.postBatchQueue.clear();
     this.state.userBatchQueue.clear();
   }
 
   // ============================================================================
-  // Private: State Transitions - Subscriptions
+  // Private: Subscriptions (ref-counted, shared by posts and users)
   // ============================================================================
 
   /**
-   * Remove a post from subscription and any pending refresh queue
+   * Subscribe an entity with reference counting. Nested surfaces that track
+   * the same entity each hold a reference; the entity stays tracked until the
+   * last one unsubscribes. The subscribe-time staleness check runs once, on
+   * the first reference.
+   * @returns true when this was the first reference (entity newly tracked)
    */
-  private removePostSubscription(compositePostId: string): void {
-    this.state.postBatchQueue.delete(compositePostId);
+  private subscribe<T extends string>(id: T, ops: EntityOps<T>): boolean {
+    if (!this.addSubscription(id, ops)) {
+      Logger.debug(`TtlCoordinator: ${ops.entityName} already subscribed (ref +1)`, {
+        id,
+        refCount: ops.refCount.get(id),
+      });
+      return false;
+    }
+
+    Logger.debug(`TtlCoordinator: ${ops.entityName} subscribed`, { id, totalSubscribed: ops.refCount.size });
+
+    // Check if the entity is stale and queue for refresh
+    void this.checkAndQueueEntity(id, ops);
+    return true;
   }
 
   /**
-   * Check if a post is currently subscribed
+   * Unsubscribe an entity. Safe if called multiple times or for unknown IDs.
+   * @returns true when the last reference was released (entity no longer tracked)
    */
-  private hasPostSubscription(compositePostId: string): boolean {
-    return this.state.postRefCount.has(compositePostId);
+  private unsubscribe<T extends string>(id: T, ops: EntityOps<T>): boolean {
+    if (!ops.refCount.has(id)) {
+      Logger.debug(`TtlCoordinator: ${ops.entityName} not subscribed (skip unsubscribe)`, { id });
+      return false;
+    }
+
+    if (!this.removeSubscription(id, ops)) {
+      Logger.debug(`TtlCoordinator: ${ops.entityName} still subscribed (ref -1)`, {
+        id,
+        refCount: ops.refCount.get(id),
+      });
+      return false;
+    }
+
+    Logger.debug(`TtlCoordinator: ${ops.entityName} unsubscribed`, { id, totalSubscribed: ops.refCount.size });
+    return true;
   }
 
   /**
-   * Add a user subscription with reference counting
-   * Increments ref count; adds to subscribed set on first reference
+   * Add a subscription with reference counting
+   * @returns true when this was the first reference (entity newly tracked)
    */
-  private addUserSubscription(userId: Pubky): void {
-    const currentCount = this.state.userRefCount.get(userId) ?? 0;
-    this.state.userRefCount.set(userId, currentCount + 1);
+  private addSubscription<T extends string>(id: T, ops: EntityOps<T>): boolean {
+    const currentCount = ops.refCount.get(id) ?? 0;
+    ops.refCount.set(id, currentCount + 1);
+    return currentCount === 0;
   }
 
   /**
-   * Remove a user subscription with reference counting
-   * Decrements ref count; removes from subscribed set when count reaches 0
+   * Remove a subscription with reference counting
+   * Removes the entity from any pending refresh queue when the count reaches 0
+   * @returns true when the last reference was released (entity no longer tracked)
    */
-  private removeUserSubscription(userId: Pubky): void {
-    const currentCount = this.state.userRefCount.get(userId) ?? 0;
+  private removeSubscription<T extends string>(id: T, ops: EntityOps<T>): boolean {
+    const currentCount = ops.refCount.get(id) ?? 0;
 
     if (currentCount <= 1) {
-      this.state.userRefCount.delete(userId);
-      this.state.userBatchQueue.delete(userId);
-    } else {
-      this.state.userRefCount.set(userId, currentCount - 1);
+      ops.refCount.delete(id);
+      ops.batchQueue.delete(id);
+      return true;
     }
+    ops.refCount.set(id, currentCount - 1);
+    return false;
   }
 
   // ============================================================================
@@ -451,7 +459,7 @@ export class TtlCoordinator {
   private getPostOps(): EntityOps<string> {
     return {
       entityName: 'post',
-      subscribed: this.state.postRefCount,
+      refCount: this.state.postRefCount,
       batchQueue: this.state.postBatchQueue,
       maxBatchSize: this.config.postMaxBatchSize,
       findStaleByIds: (ids) => TtlController.findStalePostsByIds({ postIds: ids, ttlMs: this.config.postTtlMs }),
@@ -466,7 +474,7 @@ export class TtlCoordinator {
   private getUserOps(): EntityOps<Pubky> {
     return {
       entityName: 'user',
-      subscribed: this.state.userRefCount,
+      refCount: this.state.userRefCount,
       batchQueue: this.state.userBatchQueue,
       maxBatchSize: this.config.userMaxBatchSize,
       findStaleByIds: (ids) => TtlController.findStaleUsersByIds({ userIds: ids, ttlMs: this.config.userTtlMs }),
@@ -491,12 +499,12 @@ export class TtlCoordinator {
       const staleIds = await ops.findStaleByIds([id]);
 
       // Guard against async race: only enqueue if still subscribed
-      if (staleIds.includes(id) && ops.subscribed.has(id)) {
+      if (staleIds.includes(id) && ops.refCount.has(id)) {
         ops.batchQueue.add(id);
       }
     } catch (error) {
       // On error, assume stale and queue for refresh
-      if (ops.subscribed.has(id)) {
+      if (ops.refCount.has(id)) {
         ops.batchQueue.add(id);
       }
       Logger.warn(`TtlCoordinator: Error checking ${ops.entityName} TTL`, { id, error });
@@ -507,7 +515,7 @@ export class TtlCoordinator {
    * Check all subscribed entities and queue stale ones
    */
   private async checkAllEntitiesForStaleness<T extends string>(ops: EntityOps<T>): Promise<void> {
-    const ids = Array.from(ops.subscribed.keys());
+    const ids = Array.from(ops.refCount.keys());
     if (ids.length === 0) return;
 
     try {
@@ -527,7 +535,7 @@ export class TtlCoordinator {
       }
       for (const id of staleIds) {
         // Guard: don't enqueue if unsubscribed mid-flight
-        if (ops.subscribed.has(id)) {
+        if (ops.refCount.has(id)) {
           ops.batchQueue.add(id);
         }
       }
@@ -543,7 +551,20 @@ export class TtlCoordinator {
     if (ops.batchQueue.size === 0) return;
 
     // Take up to maxBatchSize entities
-    const ids = Array.from(ops.batchQueue).slice(0, ops.maxBatchSize);
+    const queuedIds = Array.from(ops.batchQueue).slice(0, ops.maxBatchSize);
+
+    // Re-check right before the network call. An entity can sit in the queue
+    // for up to a tick, and a local-first write in that window (an owner's
+    // edit bumps its TTL row) makes the local row newer than anything Nexus
+    // could return yet; refreshing it now would overwrite that write with
+    // Nexus's not-yet-indexed copy. Drop anything no longer stale. The
+    // application-level guard covers writes that land while the fetch itself
+    // is in flight.
+    const ids = await this.filterStillStale(queuedIds, ops);
+    for (const id of queuedIds) {
+      if (!ids.includes(id)) ops.batchQueue.delete(id);
+    }
+    if (ids.length === 0) return;
 
     try {
       Logger.debug(`TtlCoordinator: Refreshing stale ${ops.entityName}s`, {
@@ -563,6 +584,28 @@ export class TtlCoordinator {
     } catch (error) {
       // FAILURE: Leave in queue for retry on next tick
       Logger.warn(`TtlCoordinator: Error refreshing stale ${ops.entityName}s`, { ids, error });
+    }
+  }
+
+  /**
+   * Narrow a queued batch to the entities that are still stale. On a lookup
+   * error assume everything is still stale (mirrors `checkAndQueueEntity`).
+   */
+  private async filterStillStale<T extends string>(ids: T[], ops: EntityOps<T>): Promise<T[]> {
+    if (ids.length === 0) return ids;
+    try {
+      const staleIds = await ops.findStaleByIds(ids);
+      const fresh = ids.filter((id) => !staleIds.includes(id));
+      if (fresh.length > 0) {
+        Logger.debug(`TtlCoordinator: Skipping ${ops.entityName}s written locally since they were queued`, {
+          ids: fresh.slice(0, 5),
+          count: fresh.length,
+        });
+      }
+      return ids.filter((id) => staleIds.includes(id));
+    } catch (error) {
+      Logger.warn(`TtlCoordinator: Error re-checking ${ops.entityName} TTL before refresh`, { error });
+      return ids;
     }
   }
 
@@ -606,13 +649,13 @@ export class TtlCoordinator {
     await Promise.all([
       TtlController.refreshStaleTags({
         kind: 'post',
-        ids: [...postOps.subscribed.keys()],
+        ids: [...postOps.refCount.keys()],
         ttlMs: this.config.postTtlMs,
         viewerId: viewerId ?? undefined,
       }),
       TtlController.refreshStaleTags({
         kind: 'user',
-        ids: [...userOps.subscribed.keys()],
+        ids: [...userOps.refCount.keys()],
         ttlMs: this.config.userTtlMs,
         viewerId: viewerId ?? undefined,
       }),

@@ -237,7 +237,7 @@ When adding controller methods:
 
 ## Tag previews, pagination, and freshness
 
-The rationale and trade-offs are recorded in [ADR 0019](adr/0019-local-first-tag-cache.md).
+The rationale and trade-offs are recorded in [ADR 0020](adr/0020-local-first-tag-cache.md).
 
 ### Loading and pagination
 

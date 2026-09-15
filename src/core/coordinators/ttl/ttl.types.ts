@@ -79,12 +79,15 @@ export interface TtlCoordinatorState {
    */
   isPageVisible: boolean;
 
-  /** Number of visible instances of a post (including multiple visual tiles). */
+  /**
+   * Reference count for posts (nested surfaces and multiple visual tiles can track the same post)
+   * Key: composite post ID, Value: number of live subscribers
+   */
   postRefCount: Map<string, number>;
 
   /**
-   * Reference count for users (multiple posts can have same author)
-   * Key: user pubky, Value: number of posts referencing this user
+   * Reference count for users (multiple surfaces can track the same user)
+   * Key: user pubky, Value: number of live subscribers
    */
   userRefCount: Map<Pubky, number>;
 
@@ -154,8 +157,8 @@ export interface TtlUnsubscribeUserParams {
 export interface EntityOps<T extends string> {
   /** Name for logging purposes */
   entityName: 'post' | 'user';
-  /** Set of currently subscribed entity IDs */
-  subscribed: ReadonlyMap<T, number>;
+  /** Live subscriber count per entity ID; an entity is subscribed while its count is above zero */
+  refCount: Map<T, number>;
   /** Queue of entity IDs pending refresh */
   batchQueue: Set<T>;
   /** Maximum entities per batch request */

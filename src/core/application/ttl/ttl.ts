@@ -66,6 +66,7 @@ export class TtlApplication {
     if (uniqueIds.length === 0) return;
 
     const revisions = await LocalTagCacheService.captureRevisions('post', uniqueIds);
+    const fetchStartedAt = Date.now();
     const postBatch = await NexusPostStreamService.fetchByIds({
       post_ids: uniqueIds,
       force: true,
@@ -82,9 +83,12 @@ export class TtlApplication {
     // A failed file write leaves the existing batch eligible for the next tick.
     await FileApplication.persistFiles(postBatch.flatMap((post) => post.attachments_metadata ?? []));
     if (params.isCurrent && !params.isCurrent()) return;
+    // The refresh guard keeps rows edited locally since the fetch started (or
+    // not yet re-indexed by Nexus) from being clobbered; see persistPosts.
     await LocalStreamPostsService.persistPosts({
       posts: postBatch,
       tagGuard: { revisions, isCurrent: params.isCurrent, viewerId: params.viewerId },
+      refreshGuard: { fetchStartedAt },
     });
     await this.refreshTagWindows(
       postBatch.map((post) =>

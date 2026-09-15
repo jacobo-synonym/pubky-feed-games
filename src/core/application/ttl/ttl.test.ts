@@ -183,8 +183,43 @@ describe('TtlApplication', () => {
       expect(persistPostsSpy).toHaveBeenCalledWith({
         posts: nexusPosts,
         tagGuard: expect.objectContaining({ revisions: expect.any(Map) }),
+        refreshGuard: { fetchStartedAt: expect.any(Number) },
       });
       expect(persistFilesSpy).toHaveBeenCalledWith([]);
+    });
+
+    it('hands persistPosts the fetch start so locally newer rows are kept atomically', async () => {
+      const viewerId = 'viewer' as Pubky;
+      const postIds = ['alice:1', 'bob:2'];
+      vi.spyOn(postStreamApi, 'postsByIds').mockReturnValue({
+        url: '/stream/posts/by_ids',
+        body: { post_ids: postIds, viewer_id: viewerId },
+      } as ReturnType<typeof postStreamApi.postsByIds>);
+
+      const nexusPost = (author: string, id: string): NexusPost => ({
+        details: { id, author: author as Pubky, content: '', indexed_at: 0, kind: 'note', uri: '', attachments: null },
+        counts: { tags: 0, unique_tags: 0, replies: 0, reposts: 0 },
+        tags: [],
+        relationships: { replied: null, reposted: null, mentioned: [] },
+        bookmark: null,
+      });
+      const nexusPosts = [nexusPost('alice', '1'), nexusPost('bob', '2')];
+      mockQueryNexus.mockResolvedValue(nexusPosts);
+      const persistPostsSpy = vi.spyOn(LocalStreamPostsService, 'persistPosts').mockResolvedValue(undefined);
+      vi.spyOn(PostStreamApplication, 'fetchOriginalPostsByUris').mockResolvedValue(undefined);
+
+      const fetchStartedAt = 1_700_000_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(fetchStartedAt);
+
+      await TtlApplication.forceRefreshPostsByIds({ postIds, viewerId });
+
+      // The "was this row edited while the fetch was in flight" check lives in
+      // persistPosts, inside the same transaction as the writes, so no
+      // local-first edit can slip between the check and the bulk save.
+      expect(persistPostsSpy).toHaveBeenCalledTimes(1);
+      expect(persistPostsSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ posts: nexusPosts, refreshGuard: { fetchStartedAt } }),
+      );
     });
 
     it('does not persist when fetch fails', async () => {

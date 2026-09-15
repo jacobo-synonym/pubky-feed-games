@@ -1,6 +1,7 @@
 import { detectModerationFromTags } from '@/application/moderation/moderation.utils';
 import { FORCE_FETCH_NEW_POSTS, SKIP_FETCH_NEW_POSTS } from '@/controllers/stream/posts/post.constants';
 import type { TStreamIdParams } from '@/controllers/stream/posts/posts.types';
+import { db } from '@/database/franky/franky';
 import { Logger } from '@/libs/logger/logger';
 import { BookmarkModel } from '@/models/bookmark/bookmark';
 import type { BookmarkModelSchema } from '@/models/bookmark/bookmark.schema';
@@ -8,12 +9,13 @@ import { CompositeIdDomain } from '@/models/models.types';
 import { buildCompositeId, buildCompositeIdFromPubkyUri } from '@/models/models.utils';
 import { ModerationModel } from '@/models/moderation/moderation';
 import { type ModerationModelSchema, ModerationType } from '@/models/moderation/moderation.schema';
+import { PostCountsModel } from '@/models/post/counts/postCounts';
 import { PostDetailsModel } from '@/models/post/details/postDetails';
 import { DELETED } from '@/models/post/details/postDetails.constants';
 import type { PostDetailsModelSchema } from '@/models/post/details/postDetails.schema';
 import { PostRelationshipsModel } from '@/models/post/relationships/postRelationships';
+import { PostTagsModel } from '@/models/post/tags/postTags';
 import { PostTtlModel } from '@/models/post/ttl/postTtl';
-import type { RecordModelBase } from '@/models/shared/base/record/baseRecord';
 import type { NexusModelTuple } from '@/models/shared/base/tuple/baseTuple.type';
 import {
   buildPostReplyStreamId,
@@ -228,6 +230,7 @@ export class LocalStreamPostsService {
    */
   static async persistPosts({
     posts,
+    refreshGuard,
     tagGuard = {},
   }: TPersistPostsParams & { tagGuard?: TagPreviewGuard }): Promise<void> {
     tagGuard = { ...tagGuard, validatedAt: tagGuard.validatedAt ?? getNexusResponseStartedAt(posts) };
@@ -237,7 +240,7 @@ export class LocalStreamPostsService {
     const postCounts: NexusModelTuple<NexusPostCounts>[] = [];
     const postRelationships: NexusModelTuple<NexusPostRelationships>[] = [];
     const postTags: NexusModelTuple<NexusTag[]>[] = [];
-    const postDetails: RecordModelBase<string, PostDetailsModelSchema>[] = [];
+    const postDetails: PostDetailsModelSchema[] = [];
     const postBookmarks: BookmarkModelSchema[] = [];
     const postModerations: ModerationModelSchema[] = [];
     const postTtl: NexusModelTuple<{ lastUpdatedAt: number }>[] = [];
@@ -306,6 +309,9 @@ export class LocalStreamPostsService {
       this.addReplyToStream({ repliedUri: post.relationships.replied, replyPostId: postId, postReplies });
     }
 
+    // Guards and writes run in ONE transaction so a local-first write cannot
+    // land between the check and the bulk save.
+    //
     // Tombstone guard. Defense-in-depth against a Nexus refetch racing a
     // local delete: if a row already has `content === DELETED`, do NOT
     // overwrite it with whatever Nexus is returning right now (the by-ids
@@ -314,30 +320,74 @@ export class LocalStreamPostsService {
     // dropped from every per-table batch below so we don't leave behind
     // orphan counts / tags / relationships / bookmarks pointing at a
     // deleted post.
-    const tombstonedIds = new Set(
-      (await PostDetailsModel.findByIdsPreserveOrder(postDetails.map((d) => d.id)))
-        .map((existing, i) => (existing?.content === DELETED ? postDetails[i].id : null))
-        .filter((id): id is string => id !== null),
-    );
-    const liveDetails = postDetails.filter((d) => !tombstonedIds.has(d.id));
-    const liveCounts = postCounts.filter(([id]) => !tombstonedIds.has(id));
-    const liveRelationships = postRelationships.filter(([id]) => !tombstonedIds.has(id));
-    const liveTags = postTags.filter(([id]) => !tombstonedIds.has(id));
-    const liveTtl = postTtl.filter(([id]) => !tombstonedIds.has(id));
-    const liveBookmarks = postBookmarks.filter((b) => !tombstonedIds.has(b.id));
-    const liveModerations = postModerations.filter((m) => !tombstonedIds.has(m.id));
+    //
+    // Refresh guard (TTL path only). A local-first edit is newer than
+    // anything Nexus can return until Nexus has re-indexed it, and the owner's
+    // next edit reads the local row — clobbering it with an older copy would
+    // then write that older state back to the homeserver. Keep the local
+    // details when the row's TTL was written at or after the fetch started
+    // (an edit landed while the fetch was in flight) or when the Nexus copy
+    // is not indexed after the local one (Nexus has not caught up yet).
+    // Counts, tags, relationships and the TTL still refresh for those rows.
+    const detailIds = postDetails.map((d) => d.id);
+    await db.transaction(
+      'rw',
+      [
+        PostDetailsModel.table,
+        PostCountsModel.table,
+        PostTagsModel.table,
+        PostRelationshipsModel.table,
+        PostTtlModel.table,
+        BookmarkModel.table,
+        ModerationModel.table,
+      ],
+      async () => {
+        const existingDetails = await PostDetailsModel.findByIdsPreserveOrder(detailIds);
+        const existingTtl = refreshGuard ? await PostTtlModel.findByIds(detailIds) : [];
+        const ttlById = new Map(existingTtl.map((record) => [record.id, record.lastUpdatedAt]));
 
-    if (tagGuard.isCurrent && !tagGuard.isCurrent()) return;
-    await Promise.all([
-      PostDetailsModel.bulkSave(liveDetails),
-      LocalTagCacheService.savePreviews('post', liveTags, tagGuard, liveCounts),
-      PostRelationshipsModel.bulkSave(liveRelationships),
-      PostTtlModel.bulkSave(liveTtl),
-      // Persist bookmarks from Nexus (viewer's bookmark status for each post)
-      liveBookmarks.length > 0 ? BookmarkModel.bulkSave(liveBookmarks) : Promise.resolve(),
-      // Persist moderation records for moderated posts (is_blurred defaults to true)
-      liveModerations.length > 0 ? ModerationModel.bulkSave(liveModerations) : Promise.resolve(),
-    ]);
+        const tombstonedIds = new Set<string>();
+        const locallyNewerIds = new Set<string>();
+        existingDetails.forEach((existing, index) => {
+          const incoming = postDetails[index];
+          if (existing?.content === DELETED) {
+            tombstonedIds.add(incoming.id);
+            return;
+          }
+          if (!refreshGuard || !existing) return;
+          const writtenSinceFetch = (ttlById.get(incoming.id) ?? 0) >= refreshGuard.fetchStartedAt;
+          const notIndexedAfterLocal = incoming.indexed_at <= existing.indexed_at;
+          if (writtenSinceFetch || notIndexedAfterLocal) locallyNewerIds.add(incoming.id);
+        });
+        if (locallyNewerIds.size > 0) {
+          Logger.debug('LocalStreamPostsService: Kept locally newer post details during refresh', {
+            ids: Array.from(locallyNewerIds).slice(0, 5),
+            count: locallyNewerIds.size,
+          });
+        }
+
+        const liveDetails = postDetails.filter((d) => !tombstonedIds.has(d.id) && !locallyNewerIds.has(d.id));
+        const liveCounts = postCounts.filter(([id]) => !tombstonedIds.has(id));
+        const liveRelationships = postRelationships.filter(([id]) => !tombstonedIds.has(id));
+        const liveTags = postTags.filter(([id]) => !tombstonedIds.has(id));
+        const liveTtl = postTtl.filter(([id]) => !tombstonedIds.has(id));
+        const liveBookmarks = postBookmarks.filter((b) => !tombstonedIds.has(b.id));
+        const liveModerations = postModerations.filter((m) => !tombstonedIds.has(m.id));
+
+        if (tagGuard.isCurrent && !tagGuard.isCurrent()) return;
+        await Promise.all([
+          PostDetailsModel.bulkSave(liveDetails),
+          // Tag previews and counts share one revision-guarded write; it joins this transaction.
+          LocalTagCacheService.savePreviews('post', liveTags, tagGuard, liveCounts),
+          PostRelationshipsModel.bulkSave(liveRelationships),
+          PostTtlModel.bulkSave(liveTtl),
+          // Persist bookmarks from Nexus (viewer's bookmark status for each post)
+          liveBookmarks.length > 0 ? BookmarkModel.bulkSave(liveBookmarks) : Promise.resolve(),
+          // Persist moderation records for moderated posts (is_blurred defaults to true)
+          liveModerations.length > 0 ? ModerationModel.bulkSave(liveModerations) : Promise.resolve(),
+        ]);
+      },
+    );
 
     if (Object.keys(postReplies).length > 0) {
       await Promise.all(
