@@ -62,6 +62,8 @@ The repo is set up so that Claude Code, Codex and Cursor all read the same instr
 | PR review            | `../.greptile/config.json`, `../.greptile/files.json`                         | Greptile rules and the docs it reads per path (it does not read `AGENTS.md` or the adapters on its own) |
 | Permissions          | `../.claude/settings.json`                                                    | Claude Code permission allowlist for the verification commands                                          |
 
+The Cursor commit rule (`../.cursor/rules/commit-message.mdc`) is agent-requested rather than path-scoped and intentionally has no Claude twin: Claude Code has no agent-requested rule type, and `../AGENTS.md` already points commits, branches and PRs at `commit-message.md`.
+
 When a convention changes: update the doc here (plus an ADR when the rule is architectural), then `AGENTS.md` if the one-line summary changed, then `.greptile/config.json` if Greptile should enforce it. The adapters only point at docs, so they rarely need a change beyond a new glob.
 
 ## Keeping Documentation Updated
