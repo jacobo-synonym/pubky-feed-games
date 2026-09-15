@@ -5,4 +5,6 @@ paths:
 ---
 # Local-First Rules
 
-@docs/local-first.md
+Read and follow `docs/local-first.md` before editing these files.
+
+@../../docs/local-first.md

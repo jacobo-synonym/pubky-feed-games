@@ -4,4 +4,6 @@ paths:
 ---
 # Component Testing Rules
 
-@docs/component-testing.md
+Read and follow `docs/component-testing.md` before editing these files.
+
+@../../docs/component-testing.md

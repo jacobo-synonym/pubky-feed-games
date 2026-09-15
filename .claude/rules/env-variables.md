@@ -7,4 +7,6 @@ paths:
 ---
 # Environment Variable Rules
 
-@docs/environment.md
+Read and follow `docs/environment.md` before editing these files.
+
+@../../docs/environment.md

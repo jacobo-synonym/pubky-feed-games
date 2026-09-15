@@ -22,27 +22,36 @@ Ask only when the table gives no answer. Status line example: `Reviewing branch 
 
 ## Step 2 — Collect the diff
 
-Write the diff to a temp file and keep the changed-file list. Reviewers read the file; the diff is never pasted into their prompts. Noise files are excluded from every scope.
+Write the diff to a temp file and keep the changed-file list. Reviewers read the file; the diff is never pasted into their prompts. Noise files are excluded from every scope. Set `SCOPE` to `local`, `branch`, `pr` or `paths` from Step 1 and run only that branch of the `case`.
 
 ```bash
 git fetch -q origin dev
 EXCLUDE=(':!package-lock.json' ':!**/__snapshots__/**' ':!**/__screenshots__/**' ':!public/sw.js' ':!src/libs/lucide/lucideIcons.aliases.ts' ':!src/libs/lucide/lucideIcons.nodes.ts' ':!src/libs/lucide/lucideIcons.tags.ts')
 OUT="${TMPDIR:-/tmp}/pubky-review-$(date +%s).diff"
 
-# Local uncommitted changes: tracked (staged + unstaged) plus untracked files.
-git diff HEAD -- . "${EXCLUDE[@]}" > "$OUT"
-git ls-files --others --exclude-standard -- . "${EXCLUDE[@]}" | while read -r f; do git diff --no-index -- /dev/null "$f" >> "$OUT"; done
-git status --porcelain -- . "${EXCLUDE[@]}"                    # changed-file list (?? = untracked)
-
-# Branch: RANGE="origin/dev...HEAD"
-# PR #N (same repo or fork):
-#   BASE=$(gh pr view N --json baseRefName --jq .baseRefName)
-#   git fetch -q origin "$BASE" "+pull/N/head:refs/remotes/origin/pr-N"   # + so a force-pushed PR head still updates
-#   RANGE="origin/$BASE...origin/pr-N"
-git diff "$RANGE" -- . "${EXCLUDE[@]}" > "$OUT"
-git diff --name-status "$RANGE" -- . "${EXCLUDE[@]}"           # changed-file list
-
-# Specific paths: git diff HEAD -- <paths> > "$OUT"; a path with no diff is reviewed as it is.
+case "$SCOPE" in
+  local)   # tracked changes (staged + unstaged) plus untracked files
+    git diff HEAD -- . "${EXCLUDE[@]}" > "$OUT"
+    git ls-files --others --exclude-standard -- . "${EXCLUDE[@]}" | while read -r f; do git diff --no-index -- /dev/null "$f" >> "$OUT" || true; done   # --no-index exits 1 on a diff
+    git status --porcelain -- . "${EXCLUDE[@]}"                       # changed-file list (?? = untracked)
+    ;;
+  branch)
+    RANGE="origin/dev...HEAD"
+    git diff "$RANGE" -- . "${EXCLUDE[@]}" > "$OUT"
+    git diff --name-status "$RANGE" -- . "${EXCLUDE[@]}"              # changed-file list
+    ;;
+  pr)      # N = the PR number; works for same-repo and fork PRs
+    BASE=$(gh pr view "$N" --json baseRefName --jq .baseRefName)
+    git fetch -q origin "$BASE" "+pull/$N/head:refs/remotes/origin/pr-$N"   # + so a force-pushed PR head still updates
+    RANGE="origin/$BASE...origin/pr-$N"
+    git diff "$RANGE" -- . "${EXCLUDE[@]}" > "$OUT"
+    git diff --name-status "$RANGE" -- . "${EXCLUDE[@]}"              # changed-file list
+    ;;
+  paths)   # PATHS = the files or directories named by the user
+    git diff HEAD -- "${PATHS[@]}" > "$OUT"                            # a path with no diff is reviewed as it is
+    git status --porcelain -- "${PATHS[@]}"
+    ;;
+esac
 ```
 
 If the diff is empty, say so and stop.
@@ -67,7 +76,7 @@ Run `npm run lint` and `npm run typecheck`; record pass/fail and the first error
 
 ## Step 5 — Dispatch three read-only reviewers
 
-Launch all three in one message so they run in parallel. Cursor: `subagent_type: "code-reviewer"` with `readonly: true`. Claude Code: the `Agent` tool with a read-only brief. A harness without sub-agents runs the three briefs one after another. Each reviewer gets the diff path, the changed-file list and its brief.
+Launch all three in one message so they run in parallel, each as the harness's built-in read-only sub-agent (Claude Code: `subagent_type: "Explore"`; Cursor: its Explore sub-agent). A harness without sub-agents runs the three briefs one after another. Each reviewer gets the diff path, the changed-file list and its brief, and must not modify files.
 
 Rules for every reviewer: read the actual source files to confirm each finding; never guess from the diff alone; never use "likely", "probably" or "appears to"; consult the doc or ADR a rule cites when a case is unclear.
 

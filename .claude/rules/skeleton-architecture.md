@@ -5,4 +5,6 @@ paths:
 ---
 # Skeleton Architecture Rules
 
-@docs/skeleton-architecture.md
+Read and follow `docs/skeleton-architecture.md` before editing these files.
+
+@../../docs/skeleton-architecture.md

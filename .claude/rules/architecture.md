@@ -4,4 +4,6 @@ paths:
 ---
 # Architecture Rules
 
-@docs/architecture.md
+Read and follow `docs/architecture.md` before editing these files.
+
+@../../docs/architecture.md

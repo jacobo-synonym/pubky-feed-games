@@ -4,4 +4,6 @@ paths:
 ---
 # Component Rules
 
-@docs/components.md
+Read and follow `docs/components.md` before editing these files.
+
+@../../docs/components.md

@@ -5,4 +5,6 @@ paths:
 ---
 # Visual Regression Testing Rules
 
-@docs/visual-regression-testing.md
+Read and follow `docs/visual-regression-testing.md` before editing these files.
+
+@../../docs/visual-regression-testing.md

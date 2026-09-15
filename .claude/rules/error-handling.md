@@ -4,4 +4,6 @@ paths:
 ---
 # Error Handling Rules
 
-@docs/error-handling.md
+Read and follow `docs/error-handling.md` before editing these files.
+
+@../../docs/error-handling.md
