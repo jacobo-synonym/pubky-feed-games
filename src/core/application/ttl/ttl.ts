@@ -69,8 +69,10 @@ export class TtlApplication {
     const uniqueIds = Array.from(new Set(params.postIds));
     if (uniqueIds.length === 0) return;
 
-    const revisions = await LocalTagCacheService.captureRevisions('post', uniqueIds);
+    // Stamp before the first await: a local write during the revision read must
+    // still count as "written since the fetch started" for the omitted-id cooldown.
     const fetchStartedAt = Date.now();
+    const revisions = await LocalTagCacheService.captureRevisions('post', uniqueIds);
     const postBatch = await NexusPostStreamService.fetchByIds({
       post_ids: uniqueIds,
       force: true,
@@ -138,8 +140,8 @@ export class TtlApplication {
     const uniqueIds = Array.from(new Set(params.userIds));
     if (uniqueIds.length === 0) return [];
 
-    const revisions = await LocalTagCacheService.captureRevisions('user', uniqueIds);
     const fetchStartedAt = Date.now();
+    const revisions = await LocalTagCacheService.captureRevisions('user', uniqueIds);
     const userBatch = await NexusUserStreamService.fetchByIds({
       user_ids: uniqueIds,
       force: true,

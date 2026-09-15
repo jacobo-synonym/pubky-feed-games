@@ -472,6 +472,43 @@ describe('TtlApplication', () => {
       });
     });
 
+    it('stamps the fetch start before reading tag revisions so a write during that read is kept', async () => {
+      const postIds = ['alice:1', 'bob:2'];
+      vi.spyOn(postStreamApi, 'postsByIds').mockReturnValue({
+        url: '/stream/posts/by_ids',
+        body: { post_ids: postIds },
+      } as ReturnType<typeof postStreamApi.postsByIds>);
+      mockQueryNexus.mockResolvedValue([nexusPost('alice', '1')]);
+      vi.spyOn(FileApplication, 'persistFiles').mockResolvedValue(undefined);
+      vi.spyOn(LocalStreamPostsService, 'persistPosts').mockResolvedValue(undefined);
+      vi.spyOn(PostStreamApplication, 'fetchOriginalPostsByUris').mockResolvedValue(undefined);
+      const deferSpy = vi.spyOn(LocalPostService, 'upsertTtlWithDelay').mockResolvedValue(undefined);
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+      vi.mocked(LocalTagCacheService.captureRevisions).mockImplementation(async () => {
+        clock.mockReturnValue(2_000); // a local edit lands while revisions are being read
+        return new Map();
+      });
+
+      await TtlApplication.forceRefreshPostsByIds({ postIds });
+
+      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob:2', getTtlRetryDelayMs(), { unlessWrittenSince: 1_000 });
+    });
+
+    it('stamps the fetch start before reading user tag revisions as well', async () => {
+      vi.spyOn(NexusUserStreamService, 'fetchByIds').mockResolvedValue([nexusUser('alice')]);
+      vi.spyOn(LocalStreamUsersService, 'persistUsers').mockResolvedValue([]);
+      const deferSpy = vi.spyOn(LocalUserService, 'upsertTtlWithDelay').mockResolvedValue(undefined);
+      const clock = vi.spyOn(Date, 'now').mockReturnValue(1_000);
+      vi.mocked(LocalTagCacheService.captureRevisions).mockImplementation(async () => {
+        clock.mockReturnValue(2_000);
+        return new Map();
+      });
+
+      await TtlApplication.forceRefreshUsersByIds({ userIds: ['alice' as Pubky, 'bob' as Pubky] });
+
+      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob', getTtlRetryDelayMs(), { unlessWrittenSince: 1_000 });
+    });
+
     it('does not park anything when the batch returned every id', async () => {
       const userIds = ['alice' as Pubky];
       vi.spyOn(NexusUserStreamService, 'fetchByIds').mockResolvedValue([nexusUser('alice')]);
