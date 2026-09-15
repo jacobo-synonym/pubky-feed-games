@@ -4,8 +4,8 @@ import type { NexusTag } from '@/services/nexus/nexus.types';
 import { LocalTagCacheService } from './tag-cache';
 
 const { tagTable, countsTable, findByIds, transaction } = vi.hoisted(() => ({
-  tagTable: { name: 'tags', get: vi.fn(), put: vi.fn() },
-  countsTable: { name: 'counts', get: vi.fn(), put: vi.fn() },
+  tagTable: { name: 'tags', get: vi.fn(), put: vi.fn(), bulkGet: vi.fn(), bulkPut: vi.fn() },
+  countsTable: { name: 'counts', get: vi.fn(), put: vi.fn(), bulkGet: vi.fn(), bulkPut: vi.fn() },
   findByIds: vi.fn(),
   transaction: vi.fn(
     async (_mode: string, _table: unknown, tableOrOperation: unknown, operation?: () => Promise<unknown>) => {
@@ -45,6 +45,19 @@ describe('LocalTagCacheService', () => {
     tagTable.put.mockReset().mockResolvedValue(undefined);
     countsTable.get.mockReset().mockResolvedValue({ tags: 5, unique_tags: 5 });
     findByIds.mockReset().mockResolvedValue([]);
+    // Bulk reads and writes mirror the single-row mocks so per-row expectations keep working.
+    tagTable.bulkGet
+      .mockReset()
+      .mockImplementation(async (ids: string[]) => Promise.all(ids.map(() => tagTable.get())));
+    tagTable.bulkPut.mockReset().mockImplementation(async (rows: unknown[]) => {
+      for (const row of rows) await tagTable.put(row);
+    });
+    countsTable.bulkGet
+      .mockReset()
+      .mockImplementation(async (ids: string[]) => Promise.all(ids.map(() => countsTable.get())));
+    countsTable.bulkPut.mockReset().mockImplementation(async (rows: unknown[]) => {
+      for (const row of rows) await countsTable.put(row);
+    });
   });
 
   it('records cooldown when an invalidation supersedes a failing refresh', async () => {
@@ -193,6 +206,67 @@ describe('LocalTagCacheService', () => {
     expect(tagTable.put).toHaveBeenCalledWith(
       expect.objectContaining({ tags: [], cache: expect.objectContaining({ cursor: 0, exhausted: true }) }),
     );
+  });
+
+  it('reads and writes a batch of previews with one bulk request per table', async () => {
+    tagTable.bulkGet.mockResolvedValue([undefined, undefined]);
+    countsTable.bulkGet.mockResolvedValue([undefined, undefined]);
+    await LocalTagCacheService.savePreviews(
+      'post',
+      [
+        ['a', tags(2)],
+        ['b', tags(1)],
+      ],
+      { viewerId: 'viewer' },
+      [
+        ['a', { tags: 2, unique_tags: 2, replies: 0, reposts: 0 }],
+        ['b', { tags: 1, unique_tags: 1, replies: 0, reposts: 0 }],
+      ],
+    );
+    expect(tagTable.bulkGet).toHaveBeenCalledExactlyOnceWith(['a', 'b']);
+    expect(countsTable.bulkGet).toHaveBeenCalledExactlyOnceWith(['a', 'b']);
+    expect(tagTable.bulkPut).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ id: 'a', cache: expect.objectContaining({ cursor: 2, exhausted: true }) }),
+      expect.objectContaining({ id: 'b', cache: expect.objectContaining({ cursor: 1, exhausted: true }) }),
+    ]);
+    expect(countsTable.bulkPut).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ id: 'a', tags: 2 }),
+      expect.objectContaining({ id: 'b', tags: 1 }),
+    ]);
+  });
+
+  it('writes nothing from a batch whose session ended during the read', async () => {
+    tagTable.bulkGet.mockResolvedValue([undefined]);
+    countsTable.bulkGet.mockResolvedValue([undefined]);
+    await LocalTagCacheService.savePreviews('post', [[entity.id, tags(2)]], { isCurrent: () => false }, [
+      [entity.id, { tags: 2, unique_tags: 2, replies: 0, reposts: 0 }],
+    ]);
+    expect(tagTable.bulkPut).not.toHaveBeenCalled();
+    expect(countsTable.bulkPut).not.toHaveBeenCalled();
+  });
+
+  it('keeps a superseded entry out of the tag write without blocking the rest of the batch', async () => {
+    tagTable.bulkGet.mockResolvedValue([record(), undefined]);
+    countsTable.bulkGet.mockResolvedValue([{ tags: 5, unique_tags: 5 }, undefined]);
+    await LocalTagCacheService.savePreviews(
+      'post',
+      [
+        [entity.id, tags(3)],
+        ['b', tags(1)],
+      ],
+      {
+        viewerId: 'viewer',
+        revisions: new Map([
+          [entity.id, 1],
+          ['b', null],
+        ]),
+      },
+      [[entity.id, { tags: 3, unique_tags: 3, replies: 9, reposts: 0 }]],
+    );
+    expect(tagTable.bulkPut).toHaveBeenCalledExactlyOnceWith([expect.objectContaining({ id: 'b' })]);
+    expect(countsTable.bulkPut).toHaveBeenCalledExactlyOnceWith([
+      expect.objectContaining({ id: entity.id, tags: 5, unique_tags: 5, replies: 9 }),
+    ]);
   });
 
   it('persists cooldown metadata without discarding a legacy expanded window', async () => {

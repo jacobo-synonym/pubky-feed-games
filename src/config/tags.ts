@@ -80,5 +80,8 @@ export const USER_TAGS_PER_PAGE = 20;
 /** Cooldown after a background tag refresh fails. */
 export const TAG_REFRESH_RETRY_MS = 30_000;
 
+/** Concurrent per-entity tag requests a background TTL pass may keep in flight. */
+export const TAG_REFRESH_MAX_CONCURRENCY = 4;
+
 /** Protection while a local tag write is waiting for Nexus indexing. */
 export const TAG_MUTATION_TTL_MS = 300_000;

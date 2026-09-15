@@ -1,9 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { Pubky } from '@/models/models.types';
 import { UserCountsModel } from '@/models/user/counts/userCounts';
 import { postStreamDirtyRegistry } from '@/services/local/stream/posts/postStreamDirtyRegistry';
 import { LocalUserTagService } from './tag.user';
 
-const { collection, saved, read } = vi.hoisted(() => ({
+const { collection, saved, read, readMany } = vi.hoisted(() => ({
   collection: {
     tags: [],
     cache: undefined,
@@ -15,6 +16,7 @@ const { collection, saved, read } = vi.hoisted(() => ({
   },
   saved: vi.fn(),
   read: vi.fn(),
+  readMany: vi.fn(),
 }));
 vi.mock('@/database/franky/franky', () => ({
   db: { transaction: async (_mode: string, _tables: unknown, run: () => Promise<unknown>) => run() },
@@ -24,6 +26,7 @@ vi.mock('@/models/user/tags/userTags', () => ({
     table: {},
     getOrCreate: read,
     findById: read,
+    findByIdsPreserveOrder: readMany,
     upsert: saved,
   },
 }));
@@ -40,6 +43,22 @@ describe('LocalUserTagService', () => {
     collection.ownsMutation.mockReturnValue(true);
     collection.addTagger.mockReturnValue(false);
     collection.removeTagger.mockReturnValue(true);
+  });
+
+  it('treats a placeholder collection as not persisted so a bulk read fills it', async () => {
+    const userIds = ['missing', 'placeholder', 'loaded', 'legacy'] as Pubky[];
+    readMany.mockResolvedValue([
+      undefined,
+      {
+        id: 'placeholder',
+        tags: [],
+        cache: { cursor: 0, exhausted: false, fetchedAt: 0, revision: 1, initialized: false },
+      },
+      { id: 'loaded', tags: [], cache: { cursor: 0, exhausted: true, fetchedAt: 1, revision: 1 } },
+      { id: 'legacy', tags: [] },
+    ]);
+    expect(await LocalUserTagService.getNotPersistedUserTagsInCache(userIds)).toEqual(['missing', 'placeholder']);
+    expect(readMany).toHaveBeenCalledWith(userIds);
   });
 
   it.each(['create', 'delete'] as const)(

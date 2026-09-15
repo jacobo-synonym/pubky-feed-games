@@ -3,12 +3,16 @@ import { FileApplication } from '@/application/file/file';
 import { PostStreamApplication } from '@/application/stream/posts/post';
 import { TagCacheApplication } from '@/application/tag/tag-cache';
 import { TtlApplication } from '@/application/ttl/ttl';
+import { TAG_REFRESH_MAX_CONCURRENCY } from '@/config/tags';
+import { getTtlRetryDelayMs } from '@/libs/runtime-config/runtime-config';
 import type { Pubky } from '@/models/models.types';
 import { PostTtlModel } from '@/models/post/ttl/postTtl';
 import { UserTtlModel } from '@/models/user/ttl/userTtl';
+import { LocalPostService } from '@/services/local/post/post';
 import { LocalStreamPostsService } from '@/services/local/stream/posts/posts';
 import { LocalStreamUsersService } from '@/services/local/stream/users/users';
 import { LocalTagCacheService } from '@/services/local/tag/tag-cache';
+import { LocalUserService } from '@/services/local/user/user';
 import type { NexusFileDetails, NexusPost, NexusUser } from '@/services/nexus/nexus.types';
 import { queryNexus } from '@/services/nexus/nexus.utils';
 import { NexusPostStreamService } from '@/services/nexus/stream/posts/postStream';
@@ -406,6 +410,109 @@ describe('TtlApplication', () => {
 
       await expect(TtlApplication.forceRefreshUsersByIds({ userIds })).rejects.toThrow('Network down');
       expect(persistUsersSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ids omitted from a batch response', () => {
+    const nexusPost = (author: string, id: string): NexusPost => ({
+      details: { id, author: author as Pubky, content: '', indexed_at: 0, kind: 'note', uri: '', attachments: null },
+      counts: { tags: 0, unique_tags: 0, replies: 0, reposts: 0 },
+      tags: [],
+      relationships: { replied: null, reposted: null, mentioned: [] },
+      bookmark: null,
+    });
+    const nexusUser = (id: string): NexusUser => ({
+      details: { id: id as Pubky, name: '', bio: '', links: null, status: null, image: null, indexed_at: 0 },
+      counts: {
+        tagged: 0,
+        tags: 0,
+        unique_tags: 0,
+        posts: 0,
+        replies: 0,
+        following: 0,
+        followers: 0,
+        friends: 0,
+        collections: 0,
+        bookmarks: 0,
+      },
+      tags: [],
+      relationship: { following: false, followed_by: false },
+    });
+
+    it('parks a post Nexus omitted for the retry delay instead of every tick', async () => {
+      const postIds = ['alice:1', 'bob:2'];
+      vi.spyOn(postStreamApi, 'postsByIds').mockReturnValue({
+        url: '/stream/posts/by_ids',
+        body: { post_ids: postIds },
+      } as ReturnType<typeof postStreamApi.postsByIds>);
+      mockQueryNexus.mockResolvedValue([nexusPost('alice', '1')]);
+      vi.spyOn(FileApplication, 'persistFiles').mockResolvedValue(undefined);
+      vi.spyOn(LocalStreamPostsService, 'persistPosts').mockResolvedValue(undefined);
+      vi.spyOn(PostStreamApplication, 'fetchOriginalPostsByUris').mockResolvedValue(undefined);
+      const deferSpy = vi.spyOn(LocalPostService, 'upsertTtlWithDelay').mockResolvedValue(undefined);
+
+      await TtlApplication.forceRefreshPostsByIds({ postIds });
+
+      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob:2', getTtlRetryDelayMs());
+    });
+
+    it('parks a user Nexus omitted for the retry delay and still reports the refreshed ones', async () => {
+      const userIds = ['alice' as Pubky, 'bob' as Pubky];
+      vi.spyOn(NexusUserStreamService, 'fetchByIds').mockResolvedValue([nexusUser('alice')]);
+      vi.spyOn(LocalStreamUsersService, 'persistUsers').mockResolvedValue([]);
+      const deferSpy = vi.spyOn(LocalUserService, 'upsertTtlWithDelay').mockResolvedValue(undefined);
+
+      const refreshed = await TtlApplication.forceRefreshUsersByIds({ userIds });
+
+      expect(refreshed).toEqual(['alice']);
+      expect(deferSpy).toHaveBeenCalledExactlyOnceWith('bob', getTtlRetryDelayMs());
+    });
+
+    it('does not park anything when the batch returned every id', async () => {
+      const userIds = ['alice' as Pubky];
+      vi.spyOn(NexusUserStreamService, 'fetchByIds').mockResolvedValue([nexusUser('alice')]);
+      vi.spyOn(LocalStreamUsersService, 'persistUsers').mockResolvedValue([]);
+      const deferSpy = vi.spyOn(LocalUserService, 'upsertTtlWithDelay').mockResolvedValue(undefined);
+
+      await TtlApplication.forceRefreshUsersByIds({ userIds });
+
+      expect(deferSpy).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('tag window refresh concurrency', () => {
+    it('keeps at most the configured number of per-entity tag requests in flight', async () => {
+      const ids = ['a', 'b', 'c', 'd', 'e', 'f'];
+      vi.mocked(LocalTagCacheService.findStale).mockResolvedValue(ids);
+      let inFlight = 0;
+      let peak = 0;
+      const release: (() => void)[] = [];
+      vi.mocked(TagCacheApplication.refreshStale).mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            inFlight += 1;
+            peak = Math.max(peak, inFlight);
+            release.push(() => {
+              inFlight -= 1;
+              resolve();
+            });
+          }),
+      );
+
+      const run = TtlApplication.refreshStaleTags({ kind: 'post', ids, ttlMs: 1000 });
+      await vi.waitFor(() =>
+        expect(TagCacheApplication.refreshStale).toHaveBeenCalledTimes(TAG_REFRESH_MAX_CONCURRENCY),
+      );
+      release.shift()!();
+      await vi.waitFor(() =>
+        expect(TagCacheApplication.refreshStale).toHaveBeenCalledTimes(TAG_REFRESH_MAX_CONCURRENCY + 1),
+      );
+      while (release.length > 0) release.shift()!();
+      await vi.waitFor(() => expect(TagCacheApplication.refreshStale).toHaveBeenCalledTimes(ids.length));
+      while (release.length > 0) release.shift()!();
+      await run;
+
+      expect(peak).toBe(TAG_REFRESH_MAX_CONCURRENCY);
     });
   });
 });

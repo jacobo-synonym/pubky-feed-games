@@ -168,6 +168,10 @@ describe('LocalPostService', () => {
 
       expect(tags).toBeTruthy();
       expect(tags!.tags).toEqual([]);
+      // A new post has no tags on Nexus yet: its author's window is initialized, complete and fresh,
+      // so the first card mount does not force a tag request and the TTL pass does not flag it.
+      expect(tags!.cache).toMatchObject({ cursor: 0, exhausted: true, revision: 0, viewerId: testData.authorPubky });
+      expect(tags!.cache!.fetchedAt).toBeGreaterThan(0);
 
       expect(relationships).toBeTruthy();
       expect(relationships!.replied).toBeNull();

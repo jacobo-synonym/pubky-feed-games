@@ -264,6 +264,37 @@ describe('UserController', () => {
     });
   });
 
+  describe('getManyTagsOrFetch viewer scoping', () => {
+    it('should default the viewer to the signed-in user', async () => {
+      vi.spyOn(useAuthStore, 'getState').mockReturnValue({
+        ...useAuthStore.getState(),
+        currentUserPubky: TEST_PUBKY.USER_2,
+      });
+      const spy = vi.spyOn(UserApplication, 'getManyTagsOrFetch').mockResolvedValue(new Map());
+
+      await UserController.getManyTagsOrFetch({ userIds: [TEST_PUBKY.USER_1] });
+
+      expect(spy).toHaveBeenCalledWith({
+        isCurrent: expect.any(Function),
+        userIds: [TEST_PUBKY.USER_1],
+        viewerId: TEST_PUBKY.USER_2,
+      });
+    });
+
+    it('should leave the viewer undefined for guests', async () => {
+      vi.spyOn(useAuthStore, 'getState').mockReturnValue({ ...useAuthStore.getState(), currentUserPubky: null });
+      const spy = vi.spyOn(UserApplication, 'getManyTagsOrFetch').mockResolvedValue(new Map());
+
+      await UserController.getManyTagsOrFetch({ userIds: [TEST_PUBKY.USER_1] });
+
+      expect(spy).toHaveBeenCalledWith({
+        isCurrent: expect.any(Function),
+        userIds: [TEST_PUBKY.USER_1],
+        viewerId: undefined,
+      });
+    });
+  });
+
   describe('fetch', () => {
     it('should pass an explicit viewer id through to UserApplication.fetch', async () => {
       vi.spyOn(useAuthStore, 'getState').mockReturnValue({ ...useAuthStore.getState(), currentUserPubky: 'other' });

@@ -86,9 +86,14 @@ export function useTagCache(kind: 'post' | 'user', id: string | null | undefined
       });
   }
 
+  // A placeholder written by invalidation or a local mutation is not loaded data. It counts
+  // as loading only while the mount fill is pending, so a failed fill shows the empty state
+  // rather than a permanent skeleton.
+  const unfilled = !record || record.cache?.initialized === false;
+
   return {
     record,
-    isLoading: !!id && (record === undefined || (!record && (initial.key !== key || initial.pending))),
+    isLoading: !!id && (record === undefined || (unfilled && (initial.key !== key || initial.pending))),
     isLoadingMore: loadingPage === key,
     loadMore,
   };

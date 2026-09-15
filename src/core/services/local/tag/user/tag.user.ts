@@ -150,6 +150,10 @@ export class LocalUserTagService {
     if (userIds.length === 0) return [];
 
     const existingTags = await UserTagsModel.findByIdsPreserveOrder(userIds);
-    return userIds.filter((_userId, index) => existingTags[index] === undefined);
+    // A placeholder written by invalidation or a local mutation is not loaded data.
+    return userIds.filter((_userId, index) => {
+      const existing = existingTags[index];
+      return existing === undefined || existing.cache?.initialized === false;
+    });
   }
 }

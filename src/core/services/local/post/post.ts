@@ -6,6 +6,7 @@ import { Err } from '@/libs/error/error.factories';
 import { ErrorService } from '@/libs/error/error.types';
 import { HttpMethod } from '@/libs/http/http.types';
 import { Logger } from '@/libs/logger/logger';
+import { getTtlPostMs } from '@/libs/runtime-config/runtime-config';
 import { CompositeIdDomain } from '@/models/models.types';
 import { buildCompositeIdFromPubkyUri, parseCompositeId } from '@/models/models.utils';
 import { PostCountsModel } from '@/models/post/counts/postCounts';
@@ -130,6 +131,18 @@ export class LocalPostService {
 
   static async updatePostCounts({ postCompositeId, countChanges }: TPostCountsParams) {
     await PostCountsModel.updateCounts({ postCompositeId, countChanges });
+  }
+
+  /**
+   * Upserts a post TTL record so the post becomes stale again after `retryDelayMs`.
+   * Used when Nexus omits a subscribed post (deleted, or not indexed yet) so the
+   * coordinator retries it on a cooldown instead of every tick.
+   *
+   * The timestamp is calculated as: now - (postTtlMs - retryDelayMs)
+   */
+  static async upsertTtlWithDelay(compositePostId: string, retryDelayMs: number): Promise<void> {
+    const lastUpdatedAt = Date.now() - (getTtlPostMs() - retryDelayMs);
+    await PostTtlModel.upsert({ id: compositePostId, lastUpdatedAt });
   }
 
   /**
@@ -286,7 +299,14 @@ export class LocalPostService {
             PostDetailsModel.create(postDetails),
             PostRelationshipsModel.create(postRelationships),
             PostCountsModel.create(postCounts),
-            PostTagsModel.create({ id: compositePostId, tags: [] }),
+            // A new post has no tags on Nexus yet. Seed an initialized, complete, fresh window
+            // for its author so the first card mount does not force a tag request and the
+            // TTL pass does not flag it immediately.
+            PostTagsModel.create({
+              id: compositePostId,
+              tags: [],
+              cache: { cursor: 0, exhausted: true, fetchedAt: Date.now(), revision: 0, viewerId: authorId },
+            }),
           ]);
 
           const ops: Promise<unknown>[] = [];

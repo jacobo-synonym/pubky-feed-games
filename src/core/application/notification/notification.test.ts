@@ -3,6 +3,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { PostStreamApplication } from '@/application/stream/posts/post';
 import { UserStreamApplication } from '@/application/stream/users/users';
 import { TagCacheApplication } from '@/application/tag/tag-cache';
+import { getTtlUserMs } from '@/config/sync';
+import { USER_TAGS_PER_PAGE } from '@/config/tags';
 import { HttpMethod } from '@/libs/http/http.types';
 import { Logger } from '@/libs/logger/logger';
 import type { Pubky } from '@/models/models.types';
@@ -736,6 +738,10 @@ describe('NotificationApplication tag invalidation', () => {
     body: { type: NotificationType.TagProfile, tagged_by: 'tagger', tag_label: 'new' },
   };
 
+  // A snapshot proves a historical event only once it is older than the tag TTL by the
+  // client clock; anything closer is treated as possibly skewed and refreshed.
+  const historicalSnapshotAt = notification.timestamp + getTtlUserMs() + 1;
+
   it('does not refetch fresh tags when opening an older notification page', async () => {
     vi.spyOn(LocalTagCacheService, 'read').mockResolvedValue({
       id: userId,
@@ -743,8 +749,8 @@ describe('NotificationApplication tag invalidation', () => {
       cache: {
         cursor: 0,
         exhausted: true,
-        fetchedAt: 200,
-        validatedAt: 150,
+        fetchedAt: historicalSnapshotAt,
+        validatedAt: historicalSnapshotAt,
         revision: 1,
         viewerId: userId,
       },
@@ -759,7 +765,7 @@ describe('NotificationApplication tag invalidation', () => {
     expect(TagCacheApplication.forceRefresh).not.toHaveBeenCalled();
   });
 
-  it('still hydrates missing details when their tag snapshot is newer than a historical event', async () => {
+  it('refreshes when the snapshot is newer than the event by less than the clock-skew margin', async () => {
     vi.spyOn(LocalTagCacheService, 'read').mockResolvedValue({
       id: userId,
       tags: [],
@@ -767,7 +773,26 @@ describe('NotificationApplication tag invalidation', () => {
         cursor: 0,
         exhausted: true,
         fetchedAt: 200,
-        validatedAt: 150,
+        validatedAt: notification.timestamp + getTtlUserMs(),
+        revision: 1,
+        viewerId: userId,
+      },
+    });
+    vi.spyOn(TagCacheApplication, 'get').mockResolvedValue(null);
+    await NotificationApplication.fetchMissingEntities({ notifications: [notification], viewerId: userId });
+    expect(LocalTagCacheService.invalidate).toHaveBeenCalledOnce();
+    expect(TagCacheApplication.forceRefresh).toHaveBeenCalledOnce();
+  });
+
+  it('still hydrates missing details when their tag snapshot is newer than a historical event', async () => {
+    vi.spyOn(LocalTagCacheService, 'read').mockResolvedValue({
+      id: userId,
+      tags: [],
+      cache: {
+        cursor: 0,
+        exhausted: true,
+        fetchedAt: historicalSnapshotAt,
+        validatedAt: historicalSnapshotAt,
         revision: 1,
         viewerId: userId,
       },
@@ -861,6 +886,29 @@ describe('NotificationApplication tag invalidation', () => {
       });
     },
   );
+
+  it('does not download again a viewer window hydration already wrote at refresh-page length', async () => {
+    // Not exhausted, but a refresh would request exactly this window back.
+    vi.spyOn(TagCacheApplication, 'get').mockResolvedValue({
+      id: userId,
+      tags: [],
+      cache: { cursor: USER_TAGS_PER_PAGE, exhausted: false, fetchedAt: 1, revision: 2, viewerId: userId },
+    });
+    await NotificationApplication.fetchMissingEntities({ notifications: [notification], viewerId: userId });
+    expect(TagCacheApplication.forceRefresh).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['a shorter preview', { cursor: 3, exhausted: false, fetchedAt: 1, revision: 2, viewerId: userId }],
+    [
+      'another viewer window',
+      { cursor: USER_TAGS_PER_PAGE, exhausted: false, fetchedAt: 1, revision: 2, viewerId: 'other' },
+    ],
+  ])('refreshes after hydration left %s', async (_label, cache) => {
+    vi.spyOn(TagCacheApplication, 'get').mockResolvedValue({ id: userId, tags: [], cache });
+    await NotificationApplication.fetchMissingEntities({ notifications: [notification], viewerId: userId });
+    expect(TagCacheApplication.forceRefresh).toHaveBeenCalledOnce();
+  });
 
   it('retains the notification when its fallback tag request fails', async () => {
     vi.spyOn(TagCacheApplication, 'get').mockResolvedValue(null);

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { USER_TAGS_PER_PAGE } from '@/config/tags';
 import { AppError } from '@/libs/error/error';
 import { ServerErrorCode, ValidationErrorCode } from '@/libs/error/error.codes';
 import { ErrorCategory, ErrorService } from '@/libs/error/error.types';
@@ -11,6 +12,7 @@ import { LocalFollowService } from '@/services/local/follow/follow';
 import { LocalProfileService } from '@/services/local/profile/profile';
 import { LocalStreamUsersService } from '@/services/local/stream/users/users';
 import { LocalTagCacheService } from '@/services/local/tag/tag-cache';
+import { LocalUserTagService } from '@/services/local/tag/user/tag.user';
 import { LocalUserService } from '@/services/local/user/user';
 import {
   NexusSocialGraphStatus,
@@ -407,6 +409,46 @@ describe('UserApplication.ensureModerationFollow', () => {
       url: followUrl,
       bodyJson: followJson,
     });
+  });
+});
+
+describe('UserApplication.getManyTagsOrFetch', () => {
+  const viewerId = 'pubky_viewer' as Pubky;
+  const cached = 'pubky_cached' as Pubky;
+  const missing = 'pubky_missing' as Pubky;
+
+  it('fetches missing tag windows scoped to the viewer and persists them as that viewer', async () => {
+    vi.spyOn(LocalUserTagService, 'getNotPersistedUserTagsInCache').mockResolvedValue([missing]);
+    vi.spyOn(LocalTagCacheService, 'captureRevisions').mockResolvedValue(new Map([[missing, null]]));
+    const tagsSpy = vi.spyOn(NexusUserService, 'tags').mockResolvedValue([]);
+    const upsertSpy = vi.spyOn(LocalUserService, 'upsertTags').mockResolvedValue(undefined);
+    const readSpy = vi.spyOn(LocalUserService, 'readBulkTags').mockResolvedValue(new Map());
+
+    await UserApplication.getManyTagsOrFetch({ userIds: [cached, missing], viewerId });
+
+    expect(tagsSpy).toHaveBeenCalledExactlyOnceWith({
+      user_id: missing,
+      viewer_id: viewerId,
+      skip_tags: 0,
+      limit_tags: USER_TAGS_PER_PAGE,
+    });
+    expect(upsertSpy).toHaveBeenCalledExactlyOnceWith(missing, [], expect.objectContaining({ viewerId }));
+    expect(readSpy).toHaveBeenCalledWith({ userIds: [cached, missing] });
+  });
+
+  it('fetches and stores a viewerless window for guests', async () => {
+    vi.spyOn(LocalUserTagService, 'getNotPersistedUserTagsInCache').mockResolvedValue([missing]);
+    vi.spyOn(LocalTagCacheService, 'captureRevisions').mockResolvedValue(new Map([[missing, null]]));
+    const tagsSpy = vi.spyOn(NexusUserService, 'tags').mockResolvedValue([]);
+    const upsertSpy = vi.spyOn(LocalUserService, 'upsertTags').mockResolvedValue(undefined);
+    vi.spyOn(LocalUserService, 'readBulkTags').mockResolvedValue(new Map());
+
+    await UserApplication.getManyTagsOrFetch({ userIds: [missing] });
+
+    expect(tagsSpy).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ user_id: missing, viewer_id: undefined }),
+    );
+    expect(upsertSpy).toHaveBeenCalledExactlyOnceWith(missing, [], expect.objectContaining({ viewerId: undefined }));
   });
 });
 

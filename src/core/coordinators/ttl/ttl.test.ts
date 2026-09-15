@@ -110,6 +110,82 @@ describe('TtlCoordinator', () => {
     );
   });
 
+  it('waits one interval before the first guest tick after sign-out', async () => {
+    setupAuthenticatedUser();
+    const coordinator = TtlCoordinator.getInstance();
+    coordinator.configure({ batchIntervalMs: 1_000 });
+    coordinator.subscribePost({ compositePostId: 'author:post' });
+    coordinator.start();
+    await waitForTick();
+    vi.mocked(TtlController.refreshStaleTags).mockClear();
+
+    // Sign-out clears the local database; the guest refresh must not race that clear.
+    useAuthStore.getState().reset();
+    await advanceAndFlush(999);
+    expect(TtlController.refreshStaleTags).not.toHaveBeenCalled();
+
+    await waitForTick();
+    expect(TtlController.refreshStaleTags).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'post', ids: ['author:post'], viewerId: undefined }),
+    );
+  });
+
+  it('refreshes the new account view immediately on an account switch', async () => {
+    setupAuthenticatedUser('first-user' as Pubky);
+    const coordinator = TtlCoordinator.getInstance();
+    coordinator.configure({ batchIntervalMs: 1_000 });
+    coordinator.subscribePost({ compositePostId: 'author:post' });
+    coordinator.start();
+    await waitForTick();
+    vi.mocked(TtlController.refreshStaleTags).mockClear();
+
+    useAuthStore
+      .getState()
+      .init({ session: mockSession(), currentUserPubky: 'second-user' as Pubky, hasProfile: true });
+    await vi.advanceTimersByTimeAsync(1);
+    await flushPromises();
+    expect(TtlController.refreshStaleTags).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'post', ids: ['author:post'], viewerId: 'second-user' }),
+    );
+  });
+
+  it('leaves ids still waiting in the entity batch queue out of the tag pass', async () => {
+    setupAuthenticatedUser();
+    const coordinator = TtlCoordinator.getInstance();
+    coordinator.configure({ batchIntervalMs: 1_000, postMaxBatchSize: 1 });
+    const first = createCompositePostId('author1', 'post1');
+    const second = createCompositePostId('author2', 'post2');
+    findStalePostsSpy.mockImplementation(async ({ postIds }: { postIds: string[] }) => postIds);
+
+    coordinator.subscribePost({ compositePostId: first });
+    coordinator.subscribePost({ compositePostId: second });
+    coordinator.start();
+    await waitForTick();
+
+    // One id fits the batch; the other keeps its place in the queue and gets its
+    // tag preview with the next entity batch instead of a request of its own.
+    expect(forceRefreshPostsSpy).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ postIds: [first] }));
+    expect(TtlController.refreshStaleTags).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'post', ids: [first] }),
+    );
+  });
+
+  it('leaves a failed entity batch out of the tag pass', async () => {
+    setupAuthenticatedUser();
+    const coordinator = TtlCoordinator.getInstance();
+    coordinator.configure({ batchIntervalMs: 1_000 });
+    const postId = createCompositePostId('author1', 'post1');
+    findStalePostsSpy.mockResolvedValue([postId]);
+    forceRefreshPostsSpy.mockRejectedValue(new Error('429'));
+
+    coordinator.subscribePost({ compositePostId: postId });
+    coordinator.start();
+    await waitForTick();
+
+    // The batch is retried next tick; its tags come with that batch, not with N single requests now.
+    expect(TtlController.refreshStaleTags).toHaveBeenCalledWith(expect.objectContaining({ kind: 'post', ids: [] }));
+  });
+
   it('contains a failed local tag scan and continues the next tick', async () => {
     vi.mocked(TtlController.refreshStaleTags).mockRejectedValueOnce(new Error('local read failed'));
     const coordinator = TtlCoordinator.getInstance();
@@ -1702,8 +1778,8 @@ describe('TtlCoordinator', () => {
       forceRefreshPostsSpy.mockClear();
       await waitForTick();
 
-      // The successful tick check supersedes the earlier read error.
-      expect(forceRefreshPostsSpy).not.toHaveBeenCalled();
+      // Should have queued for refresh (assumed stale on error)
+      expect(forceRefreshPostsSpy).toHaveBeenCalled();
     });
 
     it('forceRefresh error leaves entities in queue for retry', async () => {

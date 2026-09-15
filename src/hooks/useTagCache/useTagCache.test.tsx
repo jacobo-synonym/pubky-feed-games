@@ -175,6 +175,25 @@ describe('useTagCache', () => {
       expect(result.current.isLoading).toBe(false);
     });
 
+    it('treats an uninitialized placeholder as loading only while the fill is pending', async () => {
+      const placeholder = {
+        id: 'profile',
+        tags: [],
+        cache: { cursor: 0, exhausted: false, fetchedAt: 0, revision: 1, initialized: false },
+      } satisfies TagCollectionModelSchema<string>;
+      const request = deferred();
+      vi.mocked(useLiveQuery).mockReturnValue(placeholder);
+      vi.mocked(TagCacheController.getOrFetch).mockReturnValue(request.promise);
+      const { result } = renderHook(() => useTagCache('user', 'profile', 'viewer'));
+
+      expect(result.current.record?.tags).toEqual([]);
+      expect(result.current.isLoading).toBe(true);
+
+      // A failed fill must not leave a permanent skeleton: the placeholder renders as empty.
+      await act(async () => request.reject(offlineError()));
+      expect(result.current.isLoading).toBe(false);
+    });
+
     it('keeps cached tags visible while initialization is pending', async () => {
       const request = deferred();
       vi.mocked(useLiveQuery).mockReturnValue(cachedRecord);

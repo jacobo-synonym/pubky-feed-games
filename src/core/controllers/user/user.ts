@@ -152,8 +152,10 @@ export class UserController {
    * Get multiple user tags with local-first strategy (bulk operation)
    * Reads from cache first, fetches from API only for missing users
    */
-  static async getManyTagsOrFetch(params: TPubkyListParams): Promise<Map<Pubky, NexusTag[]>> {
-    return await UserApplication.getManyTagsOrFetch({ ...params, isCurrent: captureViewerSession() });
+  static async getManyTagsOrFetch(params: TPubkyListParams & { viewerId?: Pubky }): Promise<Map<Pubky, NexusTag[]>> {
+    // Same viewer default as `withViewer`: missing windows are fetched and stored for the signed-in user.
+    const viewerId = params.viewerId ?? useAuthStore.getState().currentUserPubky ?? undefined;
+    return await UserApplication.getManyTagsOrFetch({ ...params, viewerId, isCurrent: captureViewerSession() });
   }
 
   /**

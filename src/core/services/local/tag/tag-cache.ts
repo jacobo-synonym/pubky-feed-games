@@ -146,57 +146,68 @@ export class LocalTagCacheService {
     guard: TagPreviewGuard = {},
     counts: NexusModelTuple<NexusPostCounts | NexusUserCounts>[] = [],
   ) {
+    if (entries.length === 0) return;
     const table = this.table({ kind, id: '' });
     const countsTable: Table<(NexusPostCounts | NexusUserCounts) & { id: string }> =
       kind === 'post' ? PostCountsModel.table : UserCountsModel.table;
     const incomingCounts = new Map(counts);
+    const ids = entries.map(([id]) => id);
     await this.write(table.name, () =>
       db.transaction('rw', table, countsTable, async () => {
-        for (const [id, tags] of entries) {
-          const existing = await table.get(id);
-          if (guard.isCurrent && !guard.isCurrent()) return;
+        // One read per table, reconcile in memory (the pipes are pure), one write per
+        // table: the batch lands atomically instead of four serialized requests per entity.
+        const [existingRows, previousCountRows] = await Promise.all([table.bulkGet(ids), countsTable.bulkGet(ids)]);
+        if (guard.isCurrent && !guard.isCurrent()) return;
+        const now = Date.now();
+        const tagRows = new Map<string, TagCollectionModelSchema<string>>();
+        const countRows: ((NexusPostCounts | NexusUserCounts) & { id: string })[] = [];
+        entries.forEach(([id, tags], index) => {
+          const existing = existingRows[index];
           const revision = existing ? (existing.cache?.revision ?? 0) : null;
           const superseded = !!guard.revisions && revision !== (guard.revisions.get(id) ?? null);
           const totals = incomingCounts.get(id);
           if (totals) {
-            const previousCounts = await countsTable.get(id);
+            const previousCounts = previousCountRows[index];
             const tagCounts =
               superseded && previousCounts
                 ? { tags: previousCounts.tags, unique_tags: previousCounts.unique_tags }
-                : reconcileTagCounts(totals, tags, existing, previousCounts, guard.viewerId ?? undefined, Date.now());
-            if (guard.isCurrent && !guard.isCurrent()) return;
-            await countsTable.put({ ...totals, ...tagCounts, id });
+                : reconcileTagCounts(totals, tags, existing, previousCounts, guard.viewerId ?? undefined, now);
+            countRows.push({ ...totals, ...tagCounts, id });
           }
+          if (superseded) return;
           const foreignPreview =
             (guard.viewerId == null && existing?.cache?.viewerId != null) ||
             Object.values(existing?.mutations ?? {}).some(
-              (mutation) => mutation.expiresAt > Date.now() && mutation.viewerId !== guard.viewerId,
+              (mutation) => mutation.expiresAt > now && mutation.viewerId !== guard.viewerId,
             );
-          if (superseded) continue;
           // Global totals can prove more labels even when a different viewer's
           // preview cannot replace this tab's expanded window.
           if (existing?.cache?.exhausted && totals && totals.unique_tags > getTagCursor(existing)) {
-            await table.put({
+            tagRows.set(id, {
               ...existing,
               cache: { ...existing.cache, exhausted: false, revision: existing.cache.revision + 1 },
             });
           }
-          if (foreignPreview || getTagCursor(existing) > tags.length) continue;
-          await table.put({
+          if (foreignPreview || getTagCursor(existing) > tags.length) return;
+          tagRows.set(id, {
             id,
-            ...reconcileTagWindow(tags, existing, Date.now(), guard.viewerId ?? undefined, {
+            ...reconcileTagWindow(tags, existing, now, guard.viewerId ?? undefined, {
               complete: totals !== undefined && totals.unique_tags <= tags.length,
             }),
             cache: {
               cursor: tags.length,
               exhausted: totals !== undefined && totals.unique_tags <= tags.length,
-              fetchedAt: Date.now(),
+              fetchedAt: now,
               validatedAt: guard.validatedAt,
               viewerId: guard.viewerId ?? null,
               revision: (existing?.cache?.revision ?? 0) + 1,
             },
           });
-        }
+        });
+        await Promise.all([
+          countRows.length > 0 ? countsTable.bulkPut(countRows) : undefined,
+          tagRows.size > 0 ? table.bulkPut([...tagRows.values()]) : undefined,
+        ]);
       }),
     );
   }

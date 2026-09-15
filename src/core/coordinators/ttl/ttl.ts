@@ -212,7 +212,10 @@ export class TtlCoordinator {
       this.indexingRetries.clear();
       this.state.postBatchQueue.clear();
       this.state.userBatchQueue.clear();
-      this.evaluateAndStartTicking();
+      // Signing out clears the local database and usually navigates away. Waiting one
+      // interval keeps the guest refresh from racing the clear or refetching a page the
+      // user is leaving; an account switch refreshes the new view immediately.
+      this.evaluateAndStartTicking(state.session === null ? this.config.batchIntervalMs : 0);
     });
 
     // Listen to page visibility changes
@@ -255,10 +258,11 @@ export class TtlCoordinator {
 
   /**
    * Evaluate conditions and start/stop ticking accordingly
+   * @param initialDelayMs - Delay before the first tick of a newly started loop
    */
-  private evaluateAndStartTicking(): void {
+  private evaluateAndStartTicking(initialDelayMs = 0): void {
     if (this.shouldTick()) {
-      this.startTicking();
+      this.startTicking(initialDelayMs);
     } else {
       this.stopTicking();
     }
@@ -283,15 +287,16 @@ export class TtlCoordinator {
 
   /**
    * Start the batch tick interval
+   * @param initialDelayMs - Delay before the first tick
    */
-  private startTicking(): void {
+  private startTicking(initialDelayMs = 0): void {
     if (this.isTickLoopActive) {
       return;
     }
 
     this.isTickLoopActive = true;
     Logger.debug('TtlCoordinator: Starting batch tick loop', { intervalMs: this.config.batchIntervalMs });
-    this.scheduleNextTick(0);
+    this.scheduleNextTick(initialDelayMs);
   }
 
   /**
@@ -649,16 +654,26 @@ export class TtlCoordinator {
     await Promise.all([
       TtlController.refreshStaleTags({
         kind: 'post',
-        ids: [...postOps.refCount.keys()],
+        ids: this.tagRefreshCandidates(postOps),
         ttlMs: this.config.postTtlMs,
         viewerId: viewerId ?? undefined,
       }),
       TtlController.refreshStaleTags({
         kind: 'user',
-        ids: [...userOps.refCount.keys()],
+        ids: this.tagRefreshCandidates(userOps),
         ttlMs: this.config.userTtlMs,
         viewerId: viewerId ?? undefined,
       }),
     ]);
+  }
+
+  /**
+   * Subscribed entities whose tags may be refreshed on their own this tick.
+   * An entity still queued (beyond the batch cap, or after a failed batch) gets
+   * its tag preview with its next entity batch; a separate request per id would
+   * only duplicate that response.
+   */
+  private tagRefreshCandidates<T extends string>(ops: EntityOps<T>): T[] {
+    return Array.from(ops.refCount.keys()).filter((id) => !ops.batchQueue.has(id));
   }
 }

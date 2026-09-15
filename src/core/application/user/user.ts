@@ -5,6 +5,7 @@ import type {
   TUserCountsOrFetchResult,
   TUserSocialGraphStatusResult,
 } from '@/application/user/user.types';
+import { USER_TAGS_PER_PAGE } from '@/config/tags';
 import type { TReadProfileParams } from '@/controllers/profile/profile.types';
 import type { TFetchUserParams, TPubkyListParams } from '@/controllers/user/user.type';
 import { ValidationErrorCode } from '@/libs/error/error.codes';
@@ -369,8 +370,9 @@ export class UserApplication {
    */
   static async getManyTagsOrFetch({
     userIds,
+    viewerId,
     isCurrent,
-  }: TPubkyListParams & { isCurrent?: () => boolean }): Promise<Map<Pubky, NexusTag[]>> {
+  }: TPubkyListParams & { viewerId?: Pubky; isCurrent?: () => boolean }): Promise<Map<Pubky, NexusTag[]>> {
     if (userIds.length === 0) return new Map();
 
     // 1. Find users without cached tags
@@ -378,7 +380,7 @@ export class UserApplication {
 
     // 2. Fetch missing from API (parallel requests)
     if (cacheMissUserIds.length > 0) {
-      await this.fetchMissingUserTagsFromNexus(cacheMissUserIds, isCurrent);
+      await this.fetchMissingUserTagsFromNexus(cacheMissUserIds, viewerId, isCurrent);
     }
 
     // 3. Return all tags from cache (now populated with fetched data)
@@ -387,19 +389,31 @@ export class UserApplication {
 
   /**
    * Fetch missing user tags from Nexus API and persist to cache.
+   * The window is scoped to the viewer and persisted as theirs, so opening the
+   * profile later reuses it instead of forcing a refresh for a viewer change.
    * @param cacheMissUserIds - Array of user IDs that need tags fetched
    */
-  private static async fetchMissingUserTagsFromNexus(cacheMissUserIds: Pubky[], isCurrent?: () => boolean) {
+  private static async fetchMissingUserTagsFromNexus(
+    cacheMissUserIds: Pubky[],
+    viewerId?: Pubky,
+    isCurrent?: () => boolean,
+  ) {
     if (cacheMissUserIds.length === 0) return;
 
     const fetchPromises = cacheMissUserIds.map(async (userId) => {
       try {
         const revisions = await LocalTagCacheService.captureRevisions('user', [userId]);
-        const tags = await NexusUserService.tags({ user_id: userId, skip_tags: 0, limit_tags: 10 });
+        const tags = await NexusUserService.tags({
+          user_id: userId,
+          viewer_id: viewerId,
+          skip_tags: 0,
+          limit_tags: USER_TAGS_PER_PAGE,
+        });
         await LocalUserService.upsertTags(userId, tags, {
           revisions,
           isCurrent,
           validatedAt: getNexusResponseStartedAt(tags),
+          viewerId,
         });
       } catch {
         // Silently fail for individual user - they'll just have no tags

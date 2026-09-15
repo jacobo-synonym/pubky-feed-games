@@ -12,12 +12,15 @@ import type {
 import { PostStreamApplication } from '@/application/stream/posts/post';
 import { UserStreamApplication } from '@/application/stream/users/users';
 import { TagCacheApplication } from '@/application/tag/tag-cache';
+import { getTtlPostMs, getTtlUserMs } from '@/config/sync';
+import { POST_TAGS_PER_PAGE, USER_TAGS_PER_PAGE } from '@/config/tags';
 import { isAppError } from '@/libs/error/error.utils';
 import { HttpMethod } from '@/libs/http/http.types';
 import { Logger } from '@/libs/logger/logger';
 import { CompositeIdDomain, type Pubky } from '@/models/models.types';
 import { buildCompositeIdFromPubkyUri } from '@/models/models.utils';
 import { type FlatNotification, NotificationType } from '@/models/notification/notification.types';
+import { getTagCursor } from '@/models/shared/tag/tag.utils';
 import { NotificationNormalizer } from '@/pipes/notification/notification.normalizer';
 import { HomeserverService } from '@/services/homeserver/homeserver';
 import { LocalNotificationService } from '@/services/local/notification/notification';
@@ -363,14 +366,17 @@ export class NotificationApplication {
     const taggedEntities: TagEntity[] = [];
     for (const { entity, timestamp } of tagEvents.values()) {
       const cached = await LocalTagCacheService.read(entity);
-      // Notification and cache timestamps are epoch milliseconds. Historical
-      // pages do not invalidate a snapshot whose actual request started after the event.
+      // Notification and cache timestamps are epoch milliseconds, but the snapshot is stamped
+      // with the client clock and the event with the server clock. Skip only snapshots newer
+      // than the event by more than the tag TTL: historical pages still skip, and clock skew
+      // can delay a refresh by at most one TTL window.
+      const skewMarginMs = entity.kind === 'post' ? getTtlPostMs() : getTtlUserMs();
       if (
         cached?.cache &&
         cached.cache.initialized !== false &&
         cached.cache.fetchedAt > 0 &&
         cached.cache.validatedAt !== undefined &&
-        cached.cache.validatedAt > timestamp &&
+        cached.cache.validatedAt - skewMarginMs > timestamp &&
         cached.cache.viewerId === viewerId
       )
         continue;
@@ -404,8 +410,17 @@ export class NotificationApplication {
     await Promise.all(
       taggedEntities.map(async (entity) => {
         const cached = await TagCacheApplication.get(entity);
-        // Invalidation above makes this proof specific to hydration after this event.
-        if (cached?.cache?.exhausted && cached.cache.fetchedAt > 0 && cached.cache.viewerId === viewerId) return;
+        // Invalidation above reset fetchedAt, so any accepted window for this viewer proves
+        // hydration after this event. A complete window, or one at least a refresh page long,
+        // would only be downloaded again unchanged; a shorter preview may still miss labels.
+        const pageSize = entity.kind === 'post' ? POST_TAGS_PER_PAGE : USER_TAGS_PER_PAGE;
+        if (
+          cached?.cache &&
+          cached.cache.fetchedAt > 0 &&
+          cached.cache.viewerId === viewerId &&
+          (cached.cache.exhausted || getTagCursor(cached) >= pageSize)
+        )
+          return;
         try {
           await TagCacheApplication.forceRefresh({ ...entity, viewerId, isCurrent });
         } catch (error) {
