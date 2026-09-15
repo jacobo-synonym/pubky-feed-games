@@ -63,6 +63,9 @@ interface PostInputBaseProps {
    * Note: Only applied on mount, subsequent prop changes are ignored.
    */
   initialContent?: string;
+  initialTags?: string[];
+  hideGameButton?: boolean;
+  hideLinkEmbeds?: boolean;
   /**
    * Initial file attachments to pre-fill (e.g. from OS share target).
    * Note: Only applied on mount, subsequent prop changes are ignored.

@@ -11,12 +11,21 @@ export function useFeedGameForm(source: FeedGame) {
     resolver: zodResolver(feedGameFormSchema),
     defaultValues: {
       title: source.title,
+      kind: source.kind,
+      pattern: source.pattern,
+      seed: String(source.seed),
       theme: source.theme,
       difficulty: String(source.difficulty) as FeedGameFormData['difficulty'],
     },
   });
   const submit = form.handleSubmit((values) => {
-    setPrepared({ ...source, ...values, difficulty: Number(values.difficulty) as FeedGame['difficulty'] });
+    setPrepared({
+      ...source,
+      ...values,
+      version: 2,
+      seed: Number(values.seed),
+      difficulty: Number(values.difficulty) as FeedGame['difficulty'],
+    });
   });
   return { form, prepared, submit, edit: () => setPrepared(null) };
 }

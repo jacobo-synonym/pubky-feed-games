@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { Gamepad2 } from 'lucide-react';
 import { Image, Loader2, Newspaper, Send, Smile } from 'lucide-react';
 import { Button } from '@/atoms/Button/Button';
 import { Container } from '@/atoms/Container/Container';
@@ -25,6 +26,7 @@ export function PostInputActionBar({
   onEmojiClick,
   onImageClick,
   onArticleClick,
+  onGameClick,
   onPostClick,
   isPostDisabled = false,
   isSubmitting = false,
@@ -65,6 +67,11 @@ export function PostInputActionBar({
             <ActionButtonContent Icon={Image} />
           </Button>
         ) : null}
+        {onGameClick && !isArticle && (
+          <Button {...COMMON_BUTTON_PROPS} onClick={onGameClick} disabled={isSubmitting} aria-label="Add game">
+            <ActionButtonContent Icon={Gamepad2} />
+          </Button>
+        )}
         {!hideArticleButton ? (
           <Button
             data-cy={getButtonDataCy('Add article')}

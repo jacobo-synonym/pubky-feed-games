@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { type FeedGame, GAME_PLAY_EVENT } from '@/libs/feed-games/game';
 
 export function useFeedGamePlayer(game: FeedGame) {
-  const { seed, difficulty, theme } = game;
+  const { seed, difficulty, theme, kind, pattern } = game;
   const frame = useRef<HTMLIFrameElement>(null);
   const [channel, setChannel] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
@@ -22,7 +22,7 @@ export function useFeedGamePlayer(game: FeedGame) {
             v: 1,
             type: 'init',
             channel,
-            config: { seed, difficulty, theme },
+            config: { seed, difficulty, theme, kind, pattern },
             reduced: window.matchMedia('(prefers-reduced-motion: reduce)').matches,
             sound: false,
           },
@@ -42,7 +42,7 @@ export function useFeedGamePlayer(game: FeedGame) {
         message.type === 'result' &&
         Number.isInteger(message.result?.score) &&
         message.result.score >= 0 &&
-        message.result.score <= 1000
+        message.result.score <= (kind === 'reaction' ? (3 + 2 * difficulty) * 1000 : 1000)
       )
         setScore(message.result.score);
     };
@@ -66,7 +66,7 @@ export function useFeedGamePlayer(game: FeedGame) {
       window.removeEventListener(GAME_PLAY_EVENT, otherGame);
       document.removeEventListener('visibilitychange', pause);
     };
-  }, [channel, seed, difficulty, theme]);
+  }, [channel, seed, difficulty, theme, kind, pattern]);
   const play = () => {
     const id = crypto.randomUUID();
     window.dispatchEvent(new CustomEvent(GAME_PLAY_EVENT, { detail: id }));

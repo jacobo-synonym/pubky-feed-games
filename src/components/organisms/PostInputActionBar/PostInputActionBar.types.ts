@@ -7,6 +7,7 @@ export interface PostInputActionBarProps {
   onEmojiClick?: () => void;
   onImageClick?: () => void;
   onArticleClick?: () => void;
+  onGameClick?: () => void;
   onPostClick?: () => void;
   isPostDisabled?: boolean;
   isSubmitting?: boolean;

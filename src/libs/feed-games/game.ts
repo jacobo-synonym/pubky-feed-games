@@ -3,24 +3,44 @@ import { z } from 'zod';
 import { APP_ROUTES, POST_ROUTES } from '@/app/routes';
 
 export const GAME_REMIX_EVENT = 'pubky:remix-game';
+export const GAME_RESULT_EVENT = 'pubky:game-result';
+export const GAME_TAG = 'feed-games';
 export const GAME_PLAY_EVENT = 'pubky:play-game';
-export const gameSchema = z.object({
-  title: z
-    .string()
-    .trim()
-    .min(1)
-    .max(60)
-    .regex(/^[^\r\n\u0000-\u001f]+$/),
-  theme: z.enum(['park', 'sunset', 'midnight']),
-  difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]),
-  seed: z.number().int().min(1).max(2147483647),
-  source: z
-    .string()
-    .regex(/^[ybndrfg8ejkmcpqxot1uwisza345h769]{52}:[A-Z0-9]{13}$/)
-    .optional(),
-});
+export const postReferenceSchema = z.string().regex(/^[ybndrfg8ejkmcpqxot1uwisza345h769]{52}:[A-Z0-9]{13}$/);
+export const gameSchema = z
+  .object({
+    kind: z.enum(['pigeon', 'memory', 'reaction']).default('pigeon'),
+    version: z.union([z.literal(1), z.literal(2)]).default(1),
+    pattern: z.enum(['balanced', 'hurdles', 'snacks']).default('balanced'),
+    title: z
+      .string()
+      .trim()
+      .min(1)
+      .max(60)
+      .regex(/^[^\r\n\u0000-\u001f]+$/),
+    theme: z.enum(['park', 'sunset', 'midnight']),
+    difficulty: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+    seed: z.number().int().min(1).max(2147483647),
+    source: postReferenceSchema.optional(),
+  })
+  .refine((game) => game.version === 2 || (game.kind === 'pigeon' && game.pattern === 'balanced'), {
+    message: 'Unsupported game rules.',
+  });
 export type FeedGame = z.infer<typeof gameSchema>;
-export const SAMPLE_GAME: FeedGame = { title: 'Pigeon Lunch Run', theme: 'park', difficulty: 2, seed: 4242 };
+export const SAMPLE_GAME: FeedGame = {
+  kind: 'pigeon',
+  version: 1,
+  pattern: 'balanced',
+  title: 'Pigeon Lunch Run',
+  theme: 'park',
+  difficulty: 2,
+  seed: 4242,
+};
+export const ARCADE_GAMES: FeedGame[] = [
+  { ...SAMPLE_GAME, version: 2 },
+  { ...SAMPLE_GAME, version: 2, kind: 'memory', title: 'Pocket Pairs', theme: 'sunset', seed: 719 },
+  { ...SAMPLE_GAME, version: 2, kind: 'reaction', title: 'Signal Sprint', theme: 'midnight', seed: 2026 },
+];
 
 /** Only declarative settings are accepted. A post can never supply executable code or a player URL. */
 export function parseGameUrl(value: string, origin?: string): FeedGame | null {
@@ -38,10 +58,15 @@ export function parseGameUrl(value: string, origin?: string): FeedGame | null {
     )
       return null;
     const q = url.searchParams;
-    if (q.get('game') !== 'pigeon' || q.get('v') !== '1') return null;
-    const keys = ['game', 'v', 'title', 'theme', 'difficulty', 'seed', 'source'];
+    if (!['1', '2'].includes(q.get('v') ?? '') || !['pigeon', 'memory', 'reaction'].includes(q.get('game') ?? ''))
+      return null;
+    if (q.get('v') === '1' && (q.get('game') !== 'pigeon' || q.has('pattern'))) return null;
+    const keys = ['game', 'v', 'title', 'theme', 'difficulty', 'seed', 'source', 'pattern'];
     for (const key of q.keys()) if (!keys.includes(key) || q.getAll(key).length !== 1) return null;
     const parsed = gameSchema.safeParse({
+      kind: q.get('game'),
+      version: Number(q.get('v')),
+      pattern: q.get('pattern') ?? 'balanced',
       title: q.get('title'),
       theme: q.get('theme'),
       difficulty: Number(q.get('difficulty')),
@@ -56,14 +81,18 @@ export function parseGameUrl(value: string, origin?: string): FeedGame | null {
 
 export function gameUrl(game: FeedGame, origin: string): string {
   const url = new URL(APP_ROUTES.HOME, origin);
-  url.searchParams.set('game', 'pigeon');
-  url.searchParams.set('v', '1');
-  for (const [key, value] of Object.entries(game)) if (value !== undefined) url.searchParams.set(key, String(value));
+  url.searchParams.set('game', game.kind);
+  url.searchParams.set('v', String(game.version));
+  for (const key of ['title', 'theme', 'difficulty', 'seed', 'source'] as const) {
+    const value = game[key];
+    if (value !== undefined) url.searchParams.set(key, String(value));
+  }
+  if (game.version === 2) url.searchParams.set('pattern', game.pattern);
   return url.href;
 }
 
 export function gamePost(game: FeedGame, origin: string): string {
-  return `${game.title}\nPlay this 30-second game right in the Feed Games vibe.\n${gameUrl(game, origin)}${game.source ? `\nRemixed from ${new URL(`${POST_ROUTES.POST}/${game.source.replace(':', '/')}`, origin).href}` : ''}`;
+  return `${game.title}\nYour turn. Play this challenge inside the Feed Games vibe.\n${gameUrl(game, origin)}${game.source ? `\nRemixed from ${new URL(`${POST_ROUTES.POST}/${game.source.replace(':', '/')}`, origin).href}` : ''}`;
 }
 
 /** Find the game reference even when the caption contains another link first. */
@@ -75,3 +104,31 @@ export function findGameInContent(content: string, origin?: string): FeedGame | 
   }
   return null;
 }
+
+export function gameCover(game: FeedGame): string {
+  return `/games/${game.kind === 'pigeon' ? '' : `${game.kind}-`}${game.theme}.svg`;
+}
+export function gamePlayer(game: FeedGame): string {
+  return `/games/runtime/${game.version === 1 ? '1.0.0' : '2.0.0'}/${game.kind === 'pigeon' ? 'player' : 'arcade'}.html`;
+}
+export function gameScore(game: FeedGame, score: number): string {
+  return game.kind === 'pigeon' ? `${score} fries` : `${score} points`;
+}
+export function gameDescription(game: FeedGame): string {
+  return game.kind === 'pigeon'
+    ? 'Hop cones. Collect fries. Own the park.'
+    : game.kind === 'memory'
+      ? 'Find every pair. Keep your moves sharp.'
+      : 'Wait for the signal. Make every tap count.';
+}
+export const resultRequestSchema = z.object({
+  game: gameSchema,
+  postId: postReferenceSchema.optional(),
+  score: z.number().int().min(0).max(100000),
+});
+export type GameResultRequest = z.infer<typeof resultRequestSchema>;
+export function resultPost({ game, score }: GameResultRequest, origin: string): string {
+  return `I scored ${gameScore(game, score)} on ${game.title}. Can you beat it?\nCasual result · self-reported\n${gameUrl(game, origin)}`;
+}
+
+export type GameEditorRequest = { game: FeedGame; onInsert?: (game: FeedGame) => void };

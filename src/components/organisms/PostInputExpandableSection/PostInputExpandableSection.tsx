@@ -19,6 +19,7 @@ const IconsButton = {
 
 export function PostInputExpandableSection({
   content,
+  hideLinkEmbeds,
   tags,
   isSubmitting,
   isArticle,
@@ -34,6 +35,7 @@ export function PostInputExpandableSection({
   onEmojiSelect,
   onImageClick,
   onArticleClick,
+  onGameClick,
 }: PostInputExpandableSectionProps) {
   const hasContent = content.trim().length > 0;
   const isUiDisabled = isSubmitting || isDisabled;
@@ -46,7 +48,7 @@ export function PostInputExpandableSection({
   return (
     <>
       <Container className="gap-4">
-        {hasContent && !isArticle && <PostLinkEmbeds content={content} />}
+        {hasContent && !isArticle && !hideLinkEmbeds && <PostLinkEmbeds content={content} gamePreview />}
 
         <PostInputTags tags={tags} onTagsChange={setTags} disabled={isUiDisabled || isEdit} />
 
@@ -55,6 +57,7 @@ export function PostInputExpandableSection({
           onEmojiClick={() => setShowEmojiPicker(true)}
           onImageClick={onImageClick}
           onArticleClick={onArticleClick}
+          onGameClick={onGameClick}
           isPostDisabled={isPostDisabled}
           isSubmitting={isSubmitting}
           postButtonLabel={postButtonLabel}

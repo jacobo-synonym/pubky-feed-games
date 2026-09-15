@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { LinkifyIt } from 'linkify-it';
 import { Container } from '@/atoms/Container/Container';
+import { FEED_GAMES_ENABLED } from '@/config/feedGames';
 import { usePauseMediaOutsideViewport } from '@/hooks/usePauseMediaOutsideViewport/usePauseMediaOutsideViewport';
 import { findGameInContent } from '@/libs/feed-games/game';
 import { FeedGameCard } from '@/molecules/FeedGameCard/FeedGameCard';
@@ -118,13 +119,16 @@ const parseContentForLinkEmbed = (content: string, allowInApp: boolean): ParseUr
   }
 };
 
-export const PostLinkEmbeds = ({ content, postId }: PostLinkEmbedsProps & { postId?: string }) => {
+export const PostLinkEmbeds = ({ content, postId, gamePreview }: PostLinkEmbedsProps & { postId?: string }) => {
   const isNested = useIsNestedPostPreview();
   const { embed, provider } = useMemo(() => parseContentForLinkEmbed(content, !isNested), [content, isNested]);
   const mediaContainerRef = usePauseMediaOutsideViewport();
 
-  const game = findGameInContent(content, typeof window === 'undefined' ? undefined : window.location.origin);
-  if (game && !isNested) return <FeedGameCard key={JSON.stringify(game)} game={game} postId={postId} />;
+  const game =
+    FEED_GAMES_ENABLED &&
+    findGameInContent(content, typeof window === 'undefined' ? undefined : window.location.origin);
+  if (game && !isNested)
+    return <FeedGameCard key={JSON.stringify(game)} game={game} postId={postId} preview={gamePreview} />;
   if (game && isNested) return null;
   if (!embed || !provider) return null;
 

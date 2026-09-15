@@ -1,5 +1,7 @@
 'use client';
+import { useSearchParams } from 'next/navigation';
 import { TIMELINE_FEED_VARIANT } from '@/config/feed';
+import { FEED_GAMES_ENABLED } from '@/config/feedGames';
 import { useDefaultHomeReach } from '@/hooks/useDefaultHomeReach/useDefaultHomeReach';
 import { TaggedAsHeadline } from '@/molecules/TaggedAsHeadline/TaggedAsHeadline';
 import { AlertBackup } from '@/organisms/AlertBackup/AlertBackup';
@@ -17,6 +19,9 @@ import { TimelineFeed } from '@/organisms/Timeline/Feed/TimelineFeed/TimelineFee
  */
 export function Home() {
   useDefaultHomeReach();
+  const params = useSearchParams();
+  const gamesView =
+    FEED_GAMES_ENABLED && params.get('view') === 'games' && params.get('tags') === 'feed-games' && !params.get('q');
 
   return (
     <>
@@ -25,7 +30,11 @@ export function Home() {
       <FeedNavigation />
       <AlertBackup />
       <FeedGamesIntroduction />
-      <TimelineFeed variant={TIMELINE_FEED_VARIANT.HOME} persistentHeader={<TaggedAsHeadline />}>
+      <TimelineFeed
+        key={gamesView ? 'games' : 'home'}
+        variant={gamesView ? TIMELINE_FEED_VARIANT.SEARCH : TIMELINE_FEED_VARIANT.HOME}
+        persistentHeader={<TaggedAsHeadline />}
+      >
         <PostInput dataCy="home-post-input" variant={POST_INPUT_VARIANT.POST} />
       </TimelineFeed>
     </>

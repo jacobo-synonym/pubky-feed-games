@@ -1,11 +1,28 @@
 'use client';
 import Image from 'next/image';
-import { Play, RotateCcw, Shuffle, X } from 'lucide-react';
+import Link from 'next/link';
+import { MessageCircle, Play, RotateCcw, Shuffle, X } from 'lucide-react';
+import { POST_ROUTES } from '@/app/routes';
 import { Button } from '@/atoms/Button/Button';
 import { useFeedGamePlayer } from '@/hooks/useFeedGamePlayer/useFeedGamePlayer';
-import { type FeedGame, GAME_REMIX_EVENT } from '@/libs/feed-games/game';
+import {
+  type FeedGame,
+  GAME_REMIX_EVENT,
+  GAME_RESULT_EVENT,
+  gameCover,
+  gamePlayer,
+  gameScore,
+} from '@/libs/feed-games/game';
 
-export function FeedGameCard({ game, postId }: { game: FeedGame; postId?: string }) {
+export function FeedGameCard({
+  game,
+  postId,
+  preview = false,
+}: {
+  game: FeedGame;
+  postId?: string;
+  preview?: boolean;
+}) {
   const { frame: frameRef, channel, ready, failed, score, play, replay, close } = useFeedGamePlayer(game);
   return (
     <section
@@ -19,10 +36,14 @@ export function FeedGameCard({ game, postId }: { game: FeedGame; postId?: string
             key={channel}
             ref={frameRef}
             title={`${game.title} player`}
-            src="/games/runtime/1.0.0/player.html"
+            src={gamePlayer(game)}
             sandbox="allow-scripts"
             referrerPolicy="no-referrer"
-            className="aspect-[18/11] w-full border-0"
+            className={
+              game.kind === 'pigeon'
+                ? 'aspect-[18/11] w-full border-0'
+                : 'aspect-square w-full border-0 sm:aspect-[18/11]'
+            }
           />
           {!ready && (
             <div
@@ -38,20 +59,32 @@ export function FeedGameCard({ game, postId }: { game: FeedGame; postId?: string
               className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/95"
               role="status"
             >
-              <p className="text-3xl font-bold">{score} fries</p>
-              <p className="text-sm text-muted-foreground">Casual score · saved only for this play</p>
+              <p className="text-3xl font-bold">{gameScore(game, score)}</p>
+              <p className="text-sm text-muted-foreground">Casual score · self-reported</p>
               <Button onClick={replay}>
                 <RotateCcw />
                 Play again
               </Button>
+              {!preview && (
+                <Button
+                  variant="secondary"
+                  onClick={() => {
+                    close();
+                    window.dispatchEvent(new CustomEvent(GAME_RESULT_EVENT, { detail: { game, postId, score } }));
+                  }}
+                >
+                  <MessageCircle />
+                  {postId ? 'Reply with score' : 'Share challenge'}
+                </Button>
+              )}
             </div>
           )}
         </div>
       ) : (
         <div className="relative">
           <Image
-            src={`/games/${game.theme}.svg`}
-            alt="A hungry pigeon chasing fries through the park"
+            src={gameCover(game)}
+            alt={`${game.title} illustration`}
             width={700}
             height={420}
             className="aspect-[18/11] w-full object-cover"
@@ -69,8 +102,17 @@ export function FeedGameCard({ game, postId }: { game: FeedGame; postId?: string
         <div className="min-w-0">
           <h3 className="font-bold break-words">{game.title}</h3>
           <p className="text-sm text-muted-foreground">
-            {`30 seconds · ${['Easy', 'Medium', 'Hard'][game.difficulty - 1]} · ${game.theme}`}
+            {`${game.kind === 'pigeon' ? '30 seconds' : game.kind === 'memory' ? 'Match the pairs' : 'Quick reactions'} · ${['Easy', 'Medium', 'Hard'][game.difficulty - 1]} · ${game.theme}`}
           </p>
+          {game.source && (
+            <Link
+              className="text-xs text-muted-foreground underline"
+              href={`${POST_ROUTES.POST}/${game.source.replace(':', '/')}`}
+            >
+              Remixed from an original post
+            </Link>
+          )}
+          <p className="text-xs text-muted-foreground">{`Course ${game.seed}`}</p>
         </div>
         <div className="flex gap-2">
           {channel && (
@@ -79,19 +121,21 @@ export function FeedGameCard({ game, postId }: { game: FeedGame; postId?: string
               Close game
             </Button>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => {
-              close();
-              window.dispatchEvent(
-                new CustomEvent(GAME_REMIX_EVENT, { detail: { ...game, source: postId ?? game.source } }),
-              );
-            }}
-          >
-            <Shuffle />
-            Remix
-          </Button>
+          {!preview && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                close();
+                window.dispatchEvent(
+                  new CustomEvent(GAME_REMIX_EVENT, { detail: { ...game, source: postId ?? game.source } }),
+                );
+              }}
+            >
+              <Shuffle />
+              Remix
+            </Button>
+          )}
         </div>
       </div>
     </section>

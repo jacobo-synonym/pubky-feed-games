@@ -2,9 +2,10 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Home } from './Home';
 
+const search = vi.hoisted(() => ({ value: '' }));
 vi.mock('next/navigation', () => ({
   usePathname: () => '/home',
-  useSearchParams: () => new URLSearchParams(),
+  useSearchParams: () => new URLSearchParams(search.value),
 }));
 
 // Mock Organisms
@@ -90,6 +91,7 @@ vi.mock('@/config/feed', async (importOriginal) => {
 describe('Home', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    search.value = '';
     window.sessionStorage.clear();
   });
 
@@ -148,6 +150,12 @@ describe('Home', () => {
 });
 
 describe('Home - Snapshots', () => {
+  it('uses the native tagged search only for the optional Games view', () => {
+    search.value = 'view=games&tags=feed-games';
+    render(<Home />);
+    expect(screen.getByTestId('timeline-feed')).toHaveAttribute('data-variant', 'search');
+  });
+
   it('matches snapshot', () => {
     const { container } = render(<Home />);
     expect(container).toMatchSnapshot();

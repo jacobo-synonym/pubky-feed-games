@@ -8,13 +8,16 @@ import { PostThreadConnector } from '@/atoms/PostThreadConnector/PostThreadConne
 import { POST_THREAD_CONNECTOR_VARIANTS } from '@/atoms/PostThreadConnector/PostThreadConnector.constants';
 import { Textarea } from '@/atoms/Textarea/Textarea';
 import { Typography } from '@/atoms/Typography/Typography';
+import { FEED_GAMES_ENABLED } from '@/config/feedGames';
 import { ARTICLE_TITLE_MAX_CHARACTER_LENGTH, POST_MAX_CHARACTER_LENGTH } from '@/config/posts';
+import { POST_MAX_TAGS } from '@/config/posts';
 import { useComposerHeightAnimation } from '@/hooks/useComposerHeightAnimation/useComposerHeightAnimation';
 import { useEffectiveTagsLayout } from '@/hooks/useEffectiveTagsLayout/useEffectiveTagsLayout';
 import { useElementHeight } from '@/hooks/useElementHeight/useElementHeight';
 import { useEnterSubmit } from '@/hooks/useEnterSubmit/useEnterSubmit';
 import { usePostInput } from '@/hooks/usePostInput/usePostInput';
 import { usePostInputAuthHandlers } from '@/hooks/usePostInputAuthHandlers/usePostInputAuthHandlers';
+import { ARCADE_GAMES, type FeedGame, GAME_REMIX_EVENT, GAME_TAG, gamePost } from '@/libs/feed-games/game';
 import { getComposerDissolveVariants } from '@/libs/motion/composerMotion';
 import { parseArticleContent } from '@/libs/post/articleContent';
 import { deserializeArticleBody } from '@/libs/post/articleInlineImages';
@@ -60,6 +63,9 @@ export function PostInput({
   editAttachments,
   autoFocusTextarea = false,
   initialContent,
+  initialTags,
+  hideGameButton = false,
+  hideLinkEmbeds = false,
   initialAttachments,
   layoutOverride,
 }: PostInputProps) {
@@ -246,6 +252,7 @@ export function PostInput({
     if (initialContent && !isEdit) {
       setContent(initialContent);
     }
+    if (initialTags && !isEdit) setTags(initialTags);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only run on mount
   }, []);
 
@@ -478,6 +485,7 @@ export function PostInput({
                   >
                     <PostInputExpandableSection
                       content={content}
+                      hideLinkEmbeds={hideLinkEmbeds}
                       tags={tags}
                       isSubmitting={isSubmitting}
                       isArticle={isArticle}
@@ -489,6 +497,29 @@ export function PostInput({
                       onEmojiSelect={handleEmojiSelectWithAuth}
                       onImageClick={handleFileClickWithAuth}
                       onArticleClick={handleArticleClickWithAuth}
+                      onGameClick={
+                        FEED_GAMES_ENABLED && !hideGameButton && variant === POST_INPUT_VARIANT.POST && !isArticle
+                          ? () =>
+                              window.dispatchEvent(
+                                new CustomEvent(GAME_REMIX_EVENT, {
+                                  detail: {
+                                    game: ARCADE_GAMES[0],
+                                    onInsert: (game: FeedGame) => {
+                                      setContent(
+                                        (current) =>
+                                          `${current}${current.trim() ? '\n\n' : ''}${gamePost(game, window.location.origin)}`,
+                                      );
+                                      setTags((current) =>
+                                        current.includes(GAME_TAG) || current.length >= POST_MAX_TAGS
+                                          ? current
+                                          : [...current, GAME_TAG],
+                                      );
+                                    },
+                                  },
+                                }),
+                              )
+                          : undefined
+                      }
                       isPostDisabled={isAuthenticated ? !isValid() : false}
                       submitMode={variant}
                       submitLabel={submitLabel}

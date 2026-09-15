@@ -3,6 +3,7 @@ import type { PostInputActionSubmitMode } from '../PostInputActionBar/PostInputA
 
 export interface PostInputExpandableSectionProps {
   content: string;
+  hideLinkEmbeds?: boolean;
   tags: string[];
   isSubmitting: boolean;
   isArticle?: boolean;
@@ -25,4 +26,5 @@ export interface PostInputExpandableSectionProps {
   onEmojiSelect: (emoji: { native: string }) => void;
   onImageClick?: () => void;
   onArticleClick?: () => void;
+  onGameClick?: () => void;
 }
