@@ -1,9 +1,11 @@
 'use client';
 import { useEffect, useState } from 'react';
-import Image from 'next/image';
+import { Check, ChevronsUpDown } from 'lucide-react';
 import { Controller } from 'react-hook-form';
 import { Button } from '@/atoms/Button/Button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/atoms/Dialog/Dialog';
+import { Input } from '@/atoms/Input/Input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/atoms/Popover/Popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/atoms/Select/Select';
 import { FEED_GAMES_ENABLED } from '@/config/feedGames';
 import { useConfirmableDialog } from '@/hooks/useConfirmableDialog/useConfirmableDialog';
@@ -15,9 +17,9 @@ import {
   GAME_CREATE_EVENT,
   GAME_RESULT_EVENT,
   GAME_TAG,
-  gameCover,
   gameDescription,
   type GameEditorRequest,
+  gameLabel,
   gamePost,
   type GameResultRequest,
   gameSchema,
@@ -87,6 +89,11 @@ function GameEditor({
   const { isAuthenticated, requireAuth } = useRequireAuth();
   const confirm = useConfirmableDialog({ onClose });
   const kind = form.watch('kind');
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const templates = ARCADE_GAMES.filter((game) =>
+    `${game.title} ${gameLabel(game)}`.toLowerCase().includes(query.trim().toLowerCase()),
+  );
   const changed = () => confirm.handleContentChange('edited', [], [], '');
   return (
     <Dialog open onOpenChange={confirm.handleOpenChange}>
@@ -97,24 +104,55 @@ function GameEditor({
         </DialogHeader>
         {!prepared ? (
           <form onSubmit={submit} className="flex flex-col gap-5" onChange={changed}>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Game templates">
-              {ARCADE_GAMES.map((template) => (
-                <button
-                  type="button"
-                  key={template.kind}
-                  aria-pressed={kind === template.kind}
-                  className={`overflow-hidden rounded-xl border text-left transition-colors focus-visible:outline-2 focus-visible:outline-ring ${kind === template.kind ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary'}`}
-                  onClick={() => {
-                    form.setValue('kind', template.kind);
-                    form.setValue('title', template.title);
-                    changed();
+            <Popover
+              open={pickerOpen}
+              onOpenChange={(open) => {
+                setPickerOpen(open);
+                if (open) setQuery('');
+              }}
+            >
+              <PopoverTrigger asChild>
+                <Button type="button" variant="secondary" className="justify-between" aria-label="Choose game">
+                  {ARCADE_GAMES.find((game) => game.kind === kind)?.title}
+                  <ChevronsUpDown />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-80 max-w-full p-2">
+                <Input
+                  aria-label="Search games"
+                  placeholder="Search games"
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') event.preventDefault();
                   }}
-                >
-                  <Image src={gameCover(template)} width={210} height={126} alt="" unoptimized className="w-full" />
-                  <span className="block p-2 text-xs font-bold sm:text-sm">{template.title}</span>
-                </button>
-              ))}
-            </div>
+                />
+                <div className="mt-2 flex max-h-64 flex-col gap-1 overflow-y-auto" aria-label="Game templates">
+                  {templates.map((template) => (
+                    <Button
+                      type="button"
+                      key={template.kind}
+                      variant="ghost"
+                      className="h-auto justify-between px-3 py-3 text-left"
+                      aria-pressed={kind === template.kind}
+                      onClick={() => {
+                        form.setValue('kind', template.kind);
+                        form.setValue('title', template.title);
+                        setPickerOpen(false);
+                        changed();
+                      }}
+                    >
+                      <span className="min-w-0">
+                        <span className="block">{template.title}</span>
+                        <span className="block text-xs font-normal text-muted-foreground">{gameLabel(template)}</span>
+                      </span>
+                      {kind === template.kind && <Check className="shrink-0" />}
+                    </Button>
+                  ))}
+                  {templates.length === 0 && <p className="p-3 text-sm text-muted-foreground">No games found.</p>}
+                </div>
+              </PopoverContent>
+            </Popover>
             <p className="text-sm text-muted-foreground">{gameDescription({ ...source, kind })}</p>
             <ControlledInputField name="title" control={form.control} label="Game title" maxLength={60} />
             <div className="grid grid-cols-2 gap-4">

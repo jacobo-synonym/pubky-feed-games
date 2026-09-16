@@ -67,6 +67,19 @@ describe('Feed Games native publishing', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add game to post' }));
     expect(insert).toHaveBeenCalledWith(expect.objectContaining({ seed: 817, version: 2 }));
   });
+  it('searches the game picker and selects a game without a thumbnail grid', async () => {
+    render(<FeedGamesStudio />);
+    act(() => window.dispatchEvent(new CustomEvent(GAME_CREATE_EVENT, { detail: ARCADE_GAMES[0] })));
+    expect(screen.queryByLabelText('Game templates')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Choose game' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Search games' }), { target: { value: 'blocks' } });
+    expect(screen.queryByRole('button', { name: /Pocket Pairs/ })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Falling Blocks/ }));
+    expect(screen.getByRole('textbox', { name: 'Game title' })).toHaveValue('Falling Blocks');
+    expect(screen.queryByRole('textbox', { name: 'Search games' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Preview game post' }));
+    await waitFor(() => expect(screen.getByTestId('native-composer')).toHaveTextContent('game=blocks'));
+  });
   it('keeps publishing behind the native sign-in gate', () => {
     auth.isAuthenticated = false;
     render(<FeedGamesStudio />);

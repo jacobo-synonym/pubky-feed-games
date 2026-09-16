@@ -1,7 +1,15 @@
 import { act, render, screen } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TIMELINE_FEED_VARIANT } from '@/config/feed';
+import type { FilterContent } from '@/molecules/Filters/FilterContent/FilterContent';
 import { HomeFeedDrawer, HomeFeedDrawerMobile, HomeFeedSidebar } from './HomeFeedSidebar';
+
+const navigation = vi.hoisted(() => ({ query: '', push: vi.fn() }));
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: navigation.push }),
+  useSearchParams: () => new URLSearchParams(navigation.query),
+}));
 
 const {
   mockSetContent,
@@ -17,7 +25,7 @@ const {
   mockSetReach: vi.fn(),
   mockSetTaggedAsActive: vi.fn(),
   mockUseHomeStore: vi.fn(),
-  mockFilterContent: vi.fn(({ disabledTabs, selectedTab }: { disabledTabs?: string[]; selectedTab?: string }) => (
+  mockFilterContent: vi.fn(({ disabledTabs, selectedTab }: ComponentProps<typeof FilterContent>) => (
     <div
       data-testid="filter-content"
       data-disabled-tabs={(disabledTabs ?? []).length ? disabledTabs?.join(',') : undefined}
@@ -62,6 +70,7 @@ const {
 
 // Mock useHomeStore
 vi.mock('@/stores/home/home.types', () => ({
+  LAYOUT: { COLUMNS: 'columns' },
   REACH: {
     ALL: 'all',
     NETWORK: 'network',
@@ -116,7 +125,7 @@ vi.mock('@/atoms/Container/Container', () => {
 // Mock Molecules
 vi.mock('@/molecules/Filters/FilterContent/FilterContent', () => {
   return {
-    FilterContent: (props: { disabledTabs?: string[]; selectedTab?: string }) => mockFilterContent(props),
+    FilterContent: (props: ComponentProps<typeof FilterContent>) => mockFilterContent(props),
   };
 });
 
@@ -150,6 +159,8 @@ vi.mock('@/molecules/Filters/FilterSort/FilterSort', () => {
 });
 
 beforeEach(() => {
+  navigation.query = '';
+  navigation.push.mockClear();
   mockSetContent.mockClear();
   mockSetReach.mockClear();
   mockSetTaggedAsActive.mockClear();
@@ -181,6 +192,31 @@ beforeEach(() => {
 });
 
 describe('HomeFeedSidebar', () => {
+  it('opens Games as a native tag search with ordinary content enabled', () => {
+    render(<HomeFeedSidebar />);
+    act(() => mockFilterContent.mock.calls.at(-1)?.[0].onGamesSelect?.());
+    expect(mockSetContent).toHaveBeenCalledWith('all');
+    expect(navigation.push).toHaveBeenCalledWith('/search?tags=feed-games');
+  });
+
+  it('marks Games selected and exits the tagged view when choosing All', () => {
+    navigation.query = 'tags=feed-games';
+    render(<HomeFeedSidebar />);
+    const props = mockFilterContent.mock.calls.at(-1)?.[0];
+    expect(props?.gamesSelected).toBe(true);
+    act(() => props?.onTabChange?.('all' as NonNullable<ComponentProps<typeof FilterContent>['selectedTab']>));
+    expect(navigation.push).toHaveBeenCalledWith('/home');
+  });
+
+  it('keeps other tag searches intact when changing content', () => {
+    navigation.query = 'tags=art';
+    render(<HomeFeedSidebar />);
+    const props = mockFilterContent.mock.calls.at(-1)?.[0];
+    expect(props?.gamesSelected).toBe(false);
+    act(() => props?.onTabChange?.('all' as NonNullable<ComponentProps<typeof FilterContent>['selectedTab']>));
+    expect(navigation.push).not.toHaveBeenCalled();
+  });
+
   it('renders all filter components', () => {
     render(<HomeFeedSidebar />);
 

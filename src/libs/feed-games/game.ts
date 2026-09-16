@@ -159,3 +159,15 @@ export function suggestedGames(game: FeedGame): FeedGame[] {
   const index = ARCADE_GAMES.findIndex((item) => item.kind === game.kind);
   return Array.from({ length: 3 }, (_, offset) => ARCADE_GAMES[(index + 1 + offset) % ARCADE_GAMES.length]);
 }
+
+// Public staging posts authored for this preview; recommendations retain replies and tags.
+const STARTER_AUTHOR = 'xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo';
+export const STARTER_GAME_POSTS: Record<FeedGame['kind'], string> = {
+  pigeon: `${STARTER_AUTHOR}:0035Q2T35BHX0`,
+  memory: `${STARTER_AUTHOR}:0035Q8CJ5YR0G`,
+  reaction: `${STARTER_AUTHOR}:0035Q8CMV4MH0`,
+  maze: `${STARTER_AUTHOR}:0035Q8CB9M6TG`,
+  blocks: `${STARTER_AUTHOR}:0035Q8CS2NFTG`,
+  breaker: `${STARTER_AUTHOR}:0035Q8CV050RG`,
+  snake: `${STARTER_AUTHOR}:0035Q8CWWE560`,
+};

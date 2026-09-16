@@ -1,11 +1,15 @@
 'use client';
 
+import { useRouter, useSearchParams } from 'next/navigation';
+import { APP_ROUTES } from '@/app/routes';
 import { Container } from '@/atoms/Container/Container';
 import { TIMELINE_FEED_VARIANT, type TimelineFeedVariant } from '@/config/feed';
 import { TAGGED_AS_FILTER_KEY } from '@/config/feed';
+import { FEED_GAMES_ENABLED } from '@/config/feedGames';
 import { useFeedLayoutResolution } from '@/hooks/useFeedLayoutResolution/useFeedLayoutResolution';
 import { useRequireAuth } from '@/hooks/useRequireAuth/useRequireAuth';
 import { useSelectedReachFilter } from '@/hooks/useSelectedReachFilter/useSelectedReachFilter';
+import { GAME_TAG } from '@/libs/feed-games/game';
 import { FilterContent } from '@/molecules/Filters/FilterContent/FilterContent';
 import { FilterLayout } from '@/molecules/Filters/FilterLayout/FilterLayout';
 import { FilterReach } from '@/molecules/Filters/FilterReach/FilterReach';
@@ -13,7 +17,7 @@ import { FilterSort } from '@/molecules/Filters/FilterSort/FilterSort';
 import { useAuthStore } from '@/stores/auth/auth.store';
 import { useHomeStore } from '@/stores/home/home.store';
 import { type ReachFilterValue } from '@/stores/home/home.types';
-import { REACH, type ReachType } from '@/stores/home/home.types';
+import { CONTENT, type ContentType, LAYOUT, REACH, type ReachType } from '@/stores/home/home.types';
 import {
   resolveVisualFeedContent,
   VISUAL_DISABLED_CONTENT,
@@ -59,6 +63,19 @@ function HomeFeedFilters({
     addProfileTag,
     removeProfileTag,
   } = useHomeStore();
+  const router = useRouter();
+  const params = useSearchParams();
+  const gamesSelected = FEED_GAMES_ENABLED && params.get('tags') === GAME_TAG && !params.get('q');
+  const selectGames = () => {
+    setContent(CONTENT.ALL);
+    // Visual layout only includes media posts; games are ordinary link posts.
+    if (isVisualActive) setLayout(LAYOUT.COLUMNS);
+    router.push(`${APP_ROUTES.SEARCH}?tags=${GAME_TAG}`);
+  };
+  const selectContent = (value: ContentType) => {
+    setContent(value);
+    if (gamesSelected) router.push(APP_ROUTES.HOME);
+  };
   const currentUserPubky = useAuthStore((state) => state.currentUserPubky);
   const { requireAuth } = useRequireAuth();
   const isAuthenticated = Boolean(currentUserPubky);
@@ -94,7 +111,7 @@ function HomeFeedFilters({
   });
 
   const disabledContentTabs = isVisualActive ? VISUAL_DISABLED_CONTENT : [];
-  const showVisualLayout = allowVisualLayout && !isPhoneViewport;
+  const showVisualLayout = allowVisualLayout && !isPhoneViewport && !gamesSelected;
 
   return (
     <Container overrideDefaults className="flex flex-col gap-6">
@@ -115,14 +132,26 @@ function HomeFeedFilters({
           {!hideLayoutFilter && (
             <FilterLayout selectedTab={layout} onTabChange={setLayout} showVisual={showVisualLayout} />
           )}
-          <FilterContent selectedTab={resolvedContent} onTabChange={setContent} disabledTabs={disabledContentTabs} />
+          <FilterContent
+            selectedTab={resolvedContent}
+            onTabChange={selectContent}
+            disabledTabs={disabledContentTabs}
+            gamesSelected={gamesSelected}
+            onGamesSelect={FEED_GAMES_ENABLED ? selectGames : undefined}
+          />
         </Container>
       ) : (
         <>
           {!hideLayoutFilter && (
             <FilterLayout selectedTab={layout} onTabChange={setLayout} showVisual={showVisualLayout} />
           )}
-          <FilterContent selectedTab={resolvedContent} onTabChange={setContent} disabledTabs={disabledContentTabs} />
+          <FilterContent
+            selectedTab={resolvedContent}
+            onTabChange={selectContent}
+            disabledTabs={disabledContentTabs}
+            gamesSelected={gamesSelected}
+            onGamesSelect={FEED_GAMES_ENABLED ? selectGames : undefined}
+          />
         </>
       )}
     </Container>

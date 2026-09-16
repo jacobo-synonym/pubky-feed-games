@@ -1,13 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { CirclePlay, Download, Image, Layers, Library, Link, Newspaper, StickyNote } from 'lucide-react';
+import { CirclePlay, Download, Gamepad2, Image, Layers, Library, Link, Newspaper, StickyNote } from 'lucide-react';
 import { CONTENT, type ContentType } from '@/stores/home/home.types';
 import { FilterRadioGroup } from '../FilterRadioGroup/FilterRadioGroup';
 import { BaseFilterProps } from '../Filters.types';
 
 interface FilterContentProps extends BaseFilterProps<ContentType> {
   disabledTabs?: ContentType[];
+  gamesSelected?: boolean;
+  onGamesSelect?: () => void;
 }
 export function FilterContent({
   selectedTab,
@@ -15,6 +17,8 @@ export function FilterContent({
   onTabChange,
   disabled,
   disabledTabs = [],
+  gamesSelected = false,
+  onGamesSelect,
 }: FilterContentProps) {
   const disabledSet = React.useMemo(() => new Set(disabledTabs), [disabledTabs]);
   const isDisabled = React.useCallback(
@@ -79,10 +83,10 @@ export function FilterContent({
   return (
     <FilterRadioGroup
       title={'Content'}
-      items={items}
-      selectedValue={selectedTab}
+      items={onGamesSelect ? [...items, { key: 'games', label: 'Games', icon: Gamepad2, disabled }] : items}
+      selectedValue={gamesSelected ? 'games' : selectedTab}
       defaultValue={defaultSelectedTab}
-      onChange={onTabChange}
+      onChange={(value) => (value === 'games' ? onGamesSelect?.() : onTabChange?.(value as ContentType))}
     />
   );
 }

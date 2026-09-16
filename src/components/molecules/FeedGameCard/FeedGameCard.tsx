@@ -1,7 +1,7 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { Gamepad2, MessageCircle, Play, RotateCcw, X } from 'lucide-react';
+import { MessageCircle, Play, RotateCcw, X } from 'lucide-react';
 import { APP_ROUTES, POST_ROUTES } from '@/app/routes';
 import { Button } from '@/atoms/Button/Button';
 import { useFeedGamePlayer } from '@/hooks/useFeedGamePlayer/useFeedGamePlayer';
@@ -13,7 +13,7 @@ import {
   gameLabel,
   gamePlayer,
   gameScore,
-  gameUrl,
+  STARTER_GAME_POSTS,
   suggestedGames,
 } from '@/libs/feed-games/game';
 
@@ -85,12 +85,7 @@ export function FeedGameCard({
                 <div className="flex flex-wrap justify-center gap-2">
                   {suggestedGames(game).map((suggestion) => (
                     <Button key={suggestion.kind} asChild variant="secondary" size="sm">
-                      <Link
-                        href={gameUrl(suggestion, 'https://pubky-feed-games.vercel.app').replace(
-                          'https://pubky-feed-games.vercel.app',
-                          '',
-                        )}
-                      >
+                      <Link href={`${POST_ROUTES.POST}/${STARTER_GAME_POSTS[suggestion.kind].replace(':', '/')}`}>
                         {suggestion.title}
                       </Link>
                     </Button>
@@ -141,14 +136,6 @@ export function FeedGameCard({
           <p className="text-xs text-muted-foreground">{`Course ${game.seed}`}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          {!preview && (
-            <Button asChild variant="ghost" size="sm">
-              <Link href={`${APP_ROUTES.HOME}?play=1`}>
-                <Gamepad2 />
-                Try a game
-              </Link>
-            </Button>
-          )}
           {channel && (
             <Button variant="ghost" size="sm" onClick={close}>
               <X />

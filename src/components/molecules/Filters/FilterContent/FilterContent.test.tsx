@@ -5,6 +5,19 @@ import { CONTENT, type ContentType } from '@/stores/home/home.types';
 import { FilterContent } from './FilterContent';
 
 describe('FilterContent', () => {
+  it('offers Games as an optional alias without sending it as a post kind', () => {
+    const onGamesSelect = vi.fn();
+    const onTabChange = vi.fn();
+    render(<FilterContent onGamesSelect={onGamesSelect} onTabChange={onTabChange} gamesSelected />);
+    expect(screen.getByRole('radio', { name: 'Games' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByRole('radio', { name: 'All' })).toHaveAttribute('aria-checked', 'false');
+    fireEvent.click(screen.getByRole('radio', { name: 'Games' }));
+    expect(onGamesSelect).toHaveBeenCalledOnce();
+    expect(onTabChange).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('radio', { name: 'All' }));
+    expect(onTabChange).toHaveBeenCalledWith(CONTENT.ALL);
+  });
+
   it('renders with default selected tab', () => {
     render(<FilterContent />);
 

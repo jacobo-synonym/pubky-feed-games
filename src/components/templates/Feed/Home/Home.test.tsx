@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ARCADE_GAMES, gameUrl } from '@/libs/feed-games/game';
 import { Home } from './Home';
@@ -161,24 +161,12 @@ describe('Home - Snapshots', () => {
     expect(screen.getByTestId('timeline-feed')).toHaveAttribute('data-variant', 'search');
   });
 
-  it('keeps samples hidden until requested and links to native tag search', () => {
+  it.each(['', 'play=1'])('keeps the home feed free of game promotion (%s)', (query) => {
+    search.value = query;
     render(<Home />);
+    expect(screen.queryByRole('button', { name: 'Try a game' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'Play in feed' })).toBeNull();
-    expect(screen.queryByRole('link', { name: 'Games' })).toBeNull();
-    expect(screen.getByRole('link', { name: '#feed-games' })).toHaveAttribute('href', '/search?tags=feed-games');
-    fireEvent.click(screen.getByRole('button', { name: 'Try a game' }));
-    expect(screen.getByRole('button', { name: 'Play in feed' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Remix' })).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Try a game' }));
-    expect(screen.queryByRole('button', { name: 'Play in feed' })).toBeNull();
-  });
-
-  it('opens the sample chooser when arriving from a game card', () => {
-    search.value = 'play=1';
-    render(<Home />);
-    expect(screen.getByRole('button', { name: 'Try a game' })).toHaveAttribute('aria-expanded', 'true');
-    expect(screen.getByRole('button', { name: 'Maze Munch' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Falling Blocks' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Sample games')).toBeNull();
   });
 
   it('still opens a directly shared game without an extra discovery step', () => {

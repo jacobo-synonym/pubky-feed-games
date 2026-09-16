@@ -11,7 +11,7 @@ An experimental Pubky app fork with playable games **inside feed posts**.
 
 ## Try it
 
-Open https://pubky-feed-games.vercel.app/home. Open **Try a game** to reveal the samples, then choose **Play in feed**:
+Open https://pubky-feed-games.vercel.app/home. Choose **Content → Games** in the left filters (or mobile filter drawer), then **Play in feed** on a post:
 
 - **Pigeon Lunch Run:** hop cones and collect fries; Space, Up, or Jump. A run lasts up to 30 seconds.
 - **Pocket Pairs:** find matching cards in as few moves as possible. Difficulty sets the number of pairs.
@@ -21,13 +21,13 @@ Open https://pubky-feed-games.vercel.app/home. Open **Try a game** to reveal the
 - **Snake:** eat, grow, and avoid the walls and your own tail.
 - **Signal Sprint:** wait for green and tap. Early and missed taps score zero; difficulty sets the number of rounds.
 
-**Create game post** inside the samples opens the creator. Pick a template, title, world, difficulty and course number; runners also have balanced, hurdles and snack trail styles. Shuffle chooses a new course number. Preview before publishing. Existing composers have an **Add game** button: it inserts the configured challenge, preserves the draft and attachments, and does not auto-publish.
+The existing post composer has an **Add game** button. Its compact picker searches titles and game styles, with a scrollable list that can grow. Pick a game, title, world, difficulty and course number; runners also have balanced, hurdles and snack trail styles. Preview before inserting into the draft, then publish through the normal composer.
 
-The normal feed is the default. A quiet **Try a game** disclosure provides a cold-start path without a permanent arcade banner. The **#feed-games** link uses Pubky's existing tag search. New game and score posts start with that tag; anyone can edit it, so this is discovery, not a verified game-only index. Existing `?view=games&tags=feed-games` links remain compatible, but there is no separate Games tab in the UI.
+The normal feed has no game banner, button, or sample selector above it. **Games** is a UI alias for native `feed-games` tag search, not a new backend content kind. Selecting another Content option returns to Home. The tag is editable and anyone can use it, so results may include scores or other discussion. One starter post for every game is published from Swift-Wolf-Hawk; previous test posts remain available too. Shared challenge URLs still open a playable preview.
 
 The Remix action has been removed because changing preset settings did not provide meaningful creative remixing. Previously published references and their source links remain readable. Creation, play and score replies are the supported actions.
 
-The samples are fixtures, not authored network posts. Published game posts use `PostContentBase → PostLinkEmbeds → FeedGameCard`, retaining the existing author, reply, tag, repost, bookmark, deletion, and blur behavior.
+Composer templates are fixtures; the starter feed contains real authored network posts. Published game posts use `PostContentBase → PostLinkEmbeds → FeedGameCard`, retaining the existing author, reply, tag, repost, bookmark, deletion, and blur behavior.
 
 Finish an authored game and choose **Reply with score**: the native Pubky reply composer opens with the result and exact game reference. Nothing posts automatically. A sample instead offers **Share challenge**, which prepares a new post because it has no original post to reply to. Scores are explicitly self-reported; there is no verified leaderboard or reward system.
 
@@ -101,3 +101,20 @@ Removed Remix actions and creator remix copy, the large Feed Games heading, the 
 - No new dependencies, Docker, server services, database changes, or Vibes submission.
 
 Verification for this update: 73 targeted tests passed; full suite had 13,514 passes, 2 skips, and one localhost socket test blocked by sandbox `EPERM`. That test file passed all 53 tests when rerun with socket permission. Lint and typecheck passed. Browser checks covered all four new game launches, Falling Blocks results and recommendation navigation, mobile Snake pause/resume and results, mobile maze sizing, and the new-game creator preview. No new network posts were published. The Home visual baseline needs the existing manual VRT workflow refresh.
+
+### Games content filter (2026-09-16)
+
+Removed all **Try a game** controls and the above-feed sample selector. Home and Search filters now expose **Games** using native tag search; the same option is available in the phone drawer. Creation uses a collapsed searchable picker instead of the thumbnail grid. Game-over recommendations now link to real starter posts, preserving the social context.
+
+Published six tagged starter posts through the authenticated UI and reused the existing runner. Independently verified all six contents and tags through public staging Nexus reads:
+
+| Game           | Post ID         |
+| -------------- | --------------- |
+| Pocket Pairs   | `0035Q8CJ5YR0G` |
+| Signal Sprint  | `0035Q8CMV4MH0` |
+| Maze Munch     | `0035Q8CB9M6TG` |
+| Falling Blocks | `0035Q8CS2NFTG` |
+| Brick Breaker  | `0035Q8CV050RG` |
+| Snake          | `0035Q8CWWE560` |
+
+Author: `xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo`. No Vibes directory submission. Home/Search visual baselines need the manual **VRT Update Baselines** workflow.

@@ -18,9 +18,9 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe('FeedGameCard', () => {
-  it('links to the open chooser from a game post', () => {
+  it('keeps game promotion out of post cards', () => {
     render(<FeedGameCard game={SAMPLE_GAME} />);
-    expect(screen.getByRole('link', { name: 'Try a game' })).toHaveAttribute('href', '/home?play=1');
+    expect(screen.queryByRole('link', { name: 'Try a game' })).toBeNull();
   });
   it('offers other games after a valid result without loading them automatically', () => {
     const channel = '12345678-1234-1234-1234-123456789012';
@@ -40,7 +40,7 @@ describe('FeedGameCard', () => {
     expect(frame).not.toBeVisible();
     expect(screen.getByRole('link', { name: 'Brick Breaker' })).toHaveAttribute(
       'href',
-      expect.stringContaining('game=breaker'),
+      '/post/xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo/0035Q8CV050RG',
     );
     expect(screen.getByRole('link', { name: 'Explore #feed-games posts' })).toHaveAttribute(
       'href',
