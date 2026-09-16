@@ -1,7 +1,7 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { ARCADE_GAMES, GAME_CREATE_EVENT, GAME_RESULT_EVENT } from '@/libs/feed-games/game';
+import { ARCADE_GAMES, GAME_CHALLENGE_EVENT, GAME_CREATE_EVENT, GAME_RESULT_EVENT } from '@/libs/feed-games/game';
 import type { PostInput } from '@/organisms/PostInput/PostInput';
 import { FeedGamesStudio } from './FeedGamesStudio';
 
@@ -27,6 +27,61 @@ afterEach(() => {
 const postId = `${'y'.repeat(52)}:0035JQHRS0000`;
 
 describe('Feed Games native publishing', () => {
+  it.each([undefined, 0, 1200])('prepares a mention challenge reply with optional score %s', (score) => {
+    render(<FeedGamesStudio />);
+    act(() =>
+      window.dispatchEvent(
+        new CustomEvent(GAME_CHALLENGE_EVENT, {
+          detail: { game: ARCADE_GAMES[4], postId, score, challenge: true },
+        }),
+      ),
+    );
+    expect(screen.getByRole('heading', { name: 'Challenge someone' })).toBeInTheDocument();
+    const composer = screen.getByTestId('native-composer');
+    expect(composer).toHaveAttribute('data-variant', 'reply');
+    expect(composer).toHaveAttribute('data-parent', postId);
+    expect(composer).toHaveTextContent('Your turn, @');
+    expect(composer).toHaveTextContent('seed=87');
+    if (score === undefined) expect(composer).not.toHaveTextContent('I scored');
+    else expect(composer).toHaveTextContent(`${score} points`);
+  });
+  it('uses a root post for a shared challenge without an authored parent', () => {
+    render(<FeedGamesStudio />);
+    act(() =>
+      window.dispatchEvent(
+        new CustomEvent(GAME_CHALLENGE_EVENT, {
+          detail: { game: ARCADE_GAMES[4], challenge: true },
+        }),
+      ),
+    );
+    expect(screen.getByTestId('native-composer')).toHaveAttribute('data-variant', 'post');
+    expect(screen.getByText(/Your challenge is a public game post/)).toBeInTheDocument();
+  });
+  it('requires native sign-in before composing a mention challenge', () => {
+    auth.isAuthenticated = false;
+    render(<FeedGamesStudio />);
+    act(() =>
+      window.dispatchEvent(
+        new CustomEvent(GAME_CHALLENGE_EVENT, {
+          detail: { game: ARCADE_GAMES[4], postId, challenge: true },
+        }),
+      ),
+    );
+    expect(screen.queryByTestId('native-composer')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Sign in to challenge someone' }));
+    expect(auth.requireAuth).toHaveBeenCalled();
+  });
+  it('ignores malformed challenge event payloads', () => {
+    render(<FeedGamesStudio />);
+    act(() =>
+      window.dispatchEvent(
+        new CustomEvent(GAME_CHALLENGE_EVENT, {
+          detail: { game: ARCADE_GAMES[4], postId: 'invalid', challenge: true },
+        }),
+      ),
+    );
+    expect(screen.queryByTestId('native-composer')).toBeNull();
+  });
   it('prepares a result as a reply to the actual post, preserving the course', () => {
     render(<FeedGamesStudio />);
     act(() =>

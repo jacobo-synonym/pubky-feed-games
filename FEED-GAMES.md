@@ -120,3 +120,9 @@ Published six tagged starter posts through the authenticated UI and reused the e
 Author: `xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo`. No Vibes directory submission. Home/Search visual baselines need the manual **VRT Update Baselines** workflow.
 
 Verification: 115 focused game/navigation tests passed, lint and typecheck passed. Full regression run: 13,511 passed, 2 skipped, with nine Search filter tests failing because their router mock lacked `useRouter`. After updating that mock and the five intentional Games-row snapshots, the Search suite passed 9/9. Browser checks covered desktop selection, returning to All, phone filter availability, seeded posts visible while signed out, and post-based result recommendations.
+
+### Mention challenges (2026-09-16)
+
+Game cards and completed rounds now offer **Challenge someone**. The action opens the existing native composer with the same course reference and a trailing `@` prompt. Type a name and select a user through Pubky's mention autocomplete, then choose **Post challenge**. Authored games create public replies to their actual post; a shared preview without a parent creates a public root post. Completed rounds include the actual in-memory score, labeled self-reported. No game identity access, new notification service, automatic posts, or multiplayer state is added.
+
+Verification: 307 targeted tests passed, 2 skipped, including native mention helpers, PostInput, challenge schema bounds, score/no-score drafts, exact parent routing, preview exclusion, and sign-in gating. Lint and typecheck passed. No challenges were sent to other people during testing.

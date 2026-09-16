@@ -5,6 +5,7 @@ import { APP_ROUTES, POST_ROUTES } from '@/app/routes';
 export const GAME_KINDS = ['pigeon', 'memory', 'reaction', 'maze', 'blocks', 'breaker', 'snake'] as const;
 export const GAME_CREATE_EVENT = 'pubky:create-game';
 export const GAME_RESULT_EVENT = 'pubky:game-result';
+export const GAME_CHALLENGE_EVENT = 'pubky:game-challenge';
 export const GAME_TAG = 'feed-games';
 export const GAME_PLAY_EVENT = 'pubky:play-game';
 export const postReferenceSchema = z.string().regex(/^[ybndrfg8ejkmcpqxot1uwisza345h769]{52}:[A-Z0-9]{13}$/);
@@ -140,6 +141,19 @@ export const resultRequestSchema = z.object({
 export type GameResultRequest = z.infer<typeof resultRequestSchema>;
 export function resultPost({ game, score }: GameResultRequest, origin: string): string {
   return `I scored ${gameScore(game, score)} on ${game.title}. Can you beat it?\nCasual result · self-reported\n${gameUrl(game, origin)}`;
+}
+
+export const challengeRequestSchema = resultRequestSchema.extend({
+  challenge: z.literal(true),
+  score: resultRequestSchema.shape.score.optional(),
+});
+export type GameChallengeRequest = z.infer<typeof challengeRequestSchema>;
+export function challengePost({ game, score }: GameChallengeRequest, origin: string): string {
+  const invitation =
+    score === undefined
+      ? `Up for a game of ${game.title}?`
+      : `I scored ${gameScore(game, score)} on ${game.title}. Can you beat it?\nCasual result · self-reported`;
+  return `${invitation}\n${gameUrl(game, origin)}\n\nYour turn, @`;
 }
 
 export type GameEditorRequest = { game: FeedGame; onInsert?: (game: FeedGame) => void };

@@ -13,10 +13,14 @@ import { useFeedGameForm } from '@/hooks/useFeedGameForm/useFeedGameForm';
 import { useRequireAuth } from '@/hooks/useRequireAuth/useRequireAuth';
 import {
   ARCADE_GAMES,
+  challengePost,
+  challengeRequestSchema,
   type FeedGame,
+  GAME_CHALLENGE_EVENT,
   GAME_CREATE_EVENT,
   GAME_RESULT_EVENT,
   GAME_TAG,
+  type GameChallengeRequest,
   gameDescription,
   type GameEditorRequest,
   gameLabel,
@@ -34,7 +38,7 @@ import { POST_INPUT_VARIANT } from '@/organisms/PostInput/PostInput.constants';
 
 export function FeedGamesStudio() {
   const [request, setRequest] = useState<GameEditorRequest | null>(null);
-  const [result, setResult] = useState<GameResultRequest | null>(null);
+  const [result, setResult] = useState<GameResultRequest | GameChallengeRequest | null>(null);
   useEffect(() => {
     if (!FEED_GAMES_ENABLED) return;
     const open = (event: Event) => {
@@ -55,9 +59,18 @@ export function FeedGamesStudio() {
         setResult(parsed.data);
       }
     };
+    const challenge = (event: Event) => {
+      const parsed = challengeRequestSchema.safeParse((event as CustomEvent).detail);
+      if (parsed.success) {
+        setRequest(null);
+        setResult(parsed.data);
+      }
+    };
+    window.addEventListener(GAME_CHALLENGE_EVENT, challenge);
     window.addEventListener(GAME_CREATE_EVENT, open);
     window.addEventListener(GAME_RESULT_EVENT, share);
     return () => {
+      window.removeEventListener(GAME_CHALLENGE_EVENT, challenge);
       window.removeEventListener(GAME_CREATE_EVENT, open);
       window.removeEventListener(GAME_RESULT_EVENT, share);
     };
@@ -273,18 +286,33 @@ function GameEditor({
     </Dialog>
   );
 }
-function GameResultEditor({ request, onClose }: { request: GameResultRequest; onClose: () => void }) {
+function GameResultEditor({
+  request,
+  onClose,
+}: {
+  request: GameResultRequest | GameChallengeRequest;
+  onClose: () => void;
+}) {
+  const challenging = 'challenge' in request;
+  const origin = typeof window === 'undefined' ? 'https://pubky-feed-games.vercel.app' : window.location.origin;
+  const content = 'challenge' in request ? challengePost(request, origin) : resultPost(request, origin);
   const { isAuthenticated, requireAuth } = useRequireAuth();
   const confirm = useConfirmableDialog({ onClose });
   return (
     <Dialog open onOpenChange={confirm.handleOpenChange}>
       <DialogContent className="w-3xl" avoidKeyboard>
         <DialogHeader>
-          <DialogTitle>{request.postId ? 'Reply with your score' : 'Start a challenge'}</DialogTitle>
+          <DialogTitle>
+            {challenging ? 'Challenge someone' : request.postId ? 'Reply with your score' : 'Start a challenge'}
+          </DialogTitle>
           <DialogDescription>
-            {request.postId
-              ? 'Your result is a normal reply to this game post. Scores are casual and self-reported.'
-              : 'This sample has no original post. Publish your own challenge for friends to reply to.'}
+            {challenging
+              ? request.postId
+                ? 'Type a name after @ and choose a person. Your challenge is a public reply to this game.'
+                : 'Type a name after @ and choose a person. Your challenge is a public game post.'
+              : request.postId
+                ? 'Your result is a normal reply to this game post. Scores are casual and self-reported.'
+                : 'This sample has no original post. Publish your own challenge for friends to reply to.'}
           </DialogDescription>
         </DialogHeader>
         {isAuthenticated ? (
@@ -294,15 +322,19 @@ function GameResultEditor({ request, onClose }: { request: GameResultRequest; on
               : { variant: POST_INPUT_VARIANT.POST })}
             expanded
             hideGameButton
-            initialContent={resultPost(request, window.location.origin)}
+            initialContent={content}
+            autoFocusTextarea={challenging}
+            hideLinkEmbeds={challenging}
             initialTags={[GAME_TAG]}
             onSuccess={onClose}
             onContentChange={confirm.handleContentChange}
             layoutOverride="inline"
-            submitLabel={request.postId ? 'Post score reply' : 'Publish challenge'}
+            submitLabel={challenging ? 'Post challenge' : request.postId ? 'Post score reply' : 'Publish challenge'}
           />
         ) : (
-          <Button onClick={() => requireAuth(() => {})}>Sign in to share your score</Button>
+          <Button onClick={() => requireAuth(() => {})}>
+            {challenging ? 'Sign in to challenge someone' : 'Sign in to share your score'}
+          </Button>
         )}
         <DialogConfirmDiscard
           open={confirm.showConfirmDialog}

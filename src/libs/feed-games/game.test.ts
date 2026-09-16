@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { getContentWithMention } from '@/hooks/useMentionAutocomplete/useMentionAutocomplete.utils';
 import {
   ARCADE_GAMES,
+  challengePost,
+  challengeRequestSchema,
   findGameInContent,
   gamePlayer,
   gamePost,
@@ -66,5 +69,21 @@ describe('Arcade v2', () => {
     expect(content).toContain('6500 points');
     expect(content).toContain('self-reported');
     expect(findGameInContent(content)).toEqual(game);
+  });
+});
+
+describe('Mention challenges', () => {
+  it('preserves the course when the native autocomplete inserts a real mention', () => {
+    const game = ARCADE_GAMES[4];
+    const draft = challengePost({ game, challenge: true, score: 0 }, origin);
+    const content = getContentWithMention(`${draft}alice`, 'y'.repeat(52));
+    expect(content).toContain(`Your turn, pubky${'y'.repeat(52)} `);
+    expect(content).not.toContain('@alice');
+    expect(findGameInContent(content)).toEqual(game);
+    expect(content).toContain('0 points');
+    expect(content).toContain('self-reported');
+  });
+  it.each([-1, 1.5, 100001, '200'])('rejects an invalid challenge score %s', (score) => {
+    expect(challengeRequestSchema.safeParse({ game: ARCADE_GAMES[4], challenge: true, score }).success).toBe(false);
   });
 });

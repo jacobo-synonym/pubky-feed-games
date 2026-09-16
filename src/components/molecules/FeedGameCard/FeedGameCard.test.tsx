@@ -1,6 +1,6 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ARCADE_GAMES, GAME_PLAY_EVENT, SAMPLE_GAME } from '@/libs/feed-games/game';
+import { ARCADE_GAMES, GAME_CHALLENGE_EVENT, GAME_PLAY_EVENT, SAMPLE_GAME } from '@/libs/feed-games/game';
 import { FeedGameCard } from './FeedGameCard';
 
 beforeEach(() => {
@@ -18,6 +18,25 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 describe('FeedGameCard', () => {
+  it('opens a challenge draft with the post and exact course before playing', () => {
+    const receive = vi.fn();
+    window.addEventListener(GAME_CHALLENGE_EVENT, receive);
+    const postId = `${'y'.repeat(52)}:0035JQHRS0000`;
+    render(<FeedGameCard game={ARCADE_GAMES[6]} postId={postId} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Challenge someone' }));
+    expect(receive.mock.calls[0][0].detail).toEqual({
+      game: ARCADE_GAMES[6],
+      postId,
+      challenge: true,
+      score: undefined,
+    });
+    expect(screen.queryByTitle('Snake player')).toBeNull();
+    window.removeEventListener(GAME_CHALLENGE_EVENT, receive);
+  });
+  it('keeps challenge actions out of an unpublished creator preview', () => {
+    render(<FeedGameCard game={SAMPLE_GAME} preview />);
+    expect(screen.queryByRole('button', { name: 'Challenge someone' })).toBeNull();
+  });
   it('keeps game promotion out of post cards', () => {
     render(<FeedGameCard game={SAMPLE_GAME} />);
     expect(screen.queryByRole('link', { name: 'Try a game' })).toBeNull();
@@ -47,6 +66,14 @@ describe('FeedGameCard', () => {
       '/search?tags=feed-games',
     );
     expect(screen.queryByTitle('Brick Breaker player')).toBeNull();
+    const receive = vi.fn();
+    window.addEventListener(GAME_CHALLENGE_EVENT, receive);
+    fireEvent.click(screen.getByRole('button', { name: 'Challenge someone' }));
+    expect(receive.mock.calls[0][0].detail).toEqual(
+      expect.objectContaining({ game: ARCADE_GAMES[4], score: 1200, challenge: true }),
+    );
+    expect(screen.queryByTitle('Falling Blocks player')).toBeNull();
+    window.removeEventListener(GAME_CHALLENGE_EVENT, receive);
     vi.restoreAllMocks();
   });
   it('loads no executable frame until Play, and closes it inline', () => {

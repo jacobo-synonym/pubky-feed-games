@@ -1,12 +1,13 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MessageCircle, Play, RotateCcw, X } from 'lucide-react';
+import { MessageCircle, Play, RotateCcw, Swords, X } from 'lucide-react';
 import { APP_ROUTES, POST_ROUTES } from '@/app/routes';
 import { Button } from '@/atoms/Button/Button';
 import { useFeedGamePlayer } from '@/hooks/useFeedGamePlayer/useFeedGamePlayer';
 import {
   type FeedGame,
+  GAME_CHALLENGE_EVENT,
   GAME_RESULT_EVENT,
   GAME_TAG,
   gameCover,
@@ -27,6 +28,14 @@ export function FeedGameCard({
   preview?: boolean;
 }) {
   const { frame: frameRef, channel, ready, failed, score, play, replay, close } = useFeedGamePlayer(game);
+  const challengeSomeone = () => {
+    close();
+    window.dispatchEvent(
+      new CustomEvent(GAME_CHALLENGE_EVENT, {
+        detail: { game, postId, score: score ?? undefined, challenge: true },
+      }),
+    );
+  };
   return (
     <section
       aria-label={`${game.title} game`}
@@ -78,6 +87,12 @@ export function FeedGameCard({
                 >
                   <MessageCircle />
                   {postId ? 'Reply with score' : 'Share challenge'}
+                </Button>
+              )}
+              {!preview && (
+                <Button variant="secondary" onClick={challengeSomeone}>
+                  <Swords />
+                  Challenge someone
                 </Button>
               )}
               <div className="mt-2 w-full border-t border-border pt-3 text-center">
@@ -136,6 +151,12 @@ export function FeedGameCard({
           <p className="text-xs text-muted-foreground">{`Course ${game.seed}`}</p>
         </div>
         <div className="flex flex-wrap gap-2">
+          {!preview && !channel && (
+            <Button variant="ghost" size="sm" onClick={challengeSomeone}>
+              <Swords />
+              Challenge someone
+            </Button>
+          )}
           {channel && (
             <Button variant="ghost" size="sm" onClick={close}>
               <X />
