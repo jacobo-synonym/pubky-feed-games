@@ -1,11 +1,21 @@
 'use client';
 import Image from 'next/image';
 import Link from 'next/link';
-import { MessageCircle, Play, RotateCcw, X } from 'lucide-react';
-import { POST_ROUTES } from '@/app/routes';
+import { Gamepad2, MessageCircle, Play, RotateCcw, X } from 'lucide-react';
+import { APP_ROUTES, POST_ROUTES } from '@/app/routes';
 import { Button } from '@/atoms/Button/Button';
 import { useFeedGamePlayer } from '@/hooks/useFeedGamePlayer/useFeedGamePlayer';
-import { type FeedGame, GAME_RESULT_EVENT, gameCover, gamePlayer, gameScore } from '@/libs/feed-games/game';
+import {
+  type FeedGame,
+  GAME_RESULT_EVENT,
+  GAME_TAG,
+  gameCover,
+  gameLabel,
+  gamePlayer,
+  gameScore,
+  gameUrl,
+  suggestedGames,
+} from '@/libs/feed-games/game';
 
 export function FeedGameCard({
   game,
@@ -35,7 +45,9 @@ export function FeedGameCard({
             className={
               game.kind === 'pigeon'
                 ? 'aspect-[18/11] w-full border-0'
-                : 'aspect-square w-full border-0 sm:aspect-[18/11]'
+                : ['memory', 'reaction'].includes(game.kind)
+                  ? 'aspect-square w-full border-0'
+                  : 'aspect-[3/4] w-full border-0 sm:aspect-square'
             }
           />
           {!ready && (
@@ -49,7 +61,7 @@ export function FeedGameCard({
           )}
           {score !== null && (
             <div
-              className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-background/95"
+              className="absolute inset-0 flex flex-col items-center justify-start gap-3 overflow-y-auto bg-background/95 p-4"
               role="status"
             >
               <p className="text-3xl font-bold">{gameScore(game, score)}</p>
@@ -70,6 +82,29 @@ export function FeedGameCard({
                   {postId ? 'Reply with score' : 'Share challenge'}
                 </Button>
               )}
+              <div className="mt-2 w-full border-t border-border pt-3 text-center">
+                <p className="mb-2 text-sm text-muted-foreground">Try something else</p>
+                <div className="flex flex-wrap justify-center gap-2">
+                  {suggestedGames(game).map((suggestion) => (
+                    <Button key={suggestion.kind} asChild variant="secondary" size="sm">
+                      <Link
+                        href={gameUrl(suggestion, 'https://pubky-feed-games.vercel.app').replace(
+                          'https://pubky-feed-games.vercel.app',
+                          '',
+                        )}
+                      >
+                        {suggestion.title}
+                      </Link>
+                    </Button>
+                  ))}
+                </div>
+                <Link
+                  href={`${APP_ROUTES.SEARCH}?tags=${GAME_TAG}`}
+                  className="mt-3 inline-block text-xs text-muted-foreground underline"
+                >
+                  Explore #feed-games posts
+                </Link>
+              </div>
             </div>
           )}
         </div>
@@ -84,7 +119,7 @@ export function FeedGameCard({
             unoptimized
           />
           <div className="absolute bottom-4 left-4">
-            <Button variant="dark" size="lg" onClick={play}>
+            <Button variant="secondary" onClick={play}>
               <Play />
               Play in feed
             </Button>
@@ -95,7 +130,7 @@ export function FeedGameCard({
         <div className="min-w-0">
           <h3 className="font-bold break-words">{game.title}</h3>
           <p className="text-sm text-muted-foreground">
-            {`${game.kind === 'pigeon' ? '30 seconds' : game.kind === 'memory' ? 'Match the pairs' : 'Quick reactions'} · ${['Easy', 'Medium', 'Hard'][game.difficulty - 1]} · ${game.theme}`}
+            {`${gameLabel(game)} · ${['Easy', 'Medium', 'Hard'][game.difficulty - 1]} · ${game.theme}`}
           </p>
           {game.source && (
             <Link
@@ -107,7 +142,15 @@ export function FeedGameCard({
           )}
           <p className="text-xs text-muted-foreground">{`Course ${game.seed}`}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {!preview && (
+            <Button asChild variant="ghost" size="sm">
+              <Link href={`${APP_ROUTES.HOME}?play=1`}>
+                <Gamepad2 />
+                Try a game
+              </Link>
+            </Button>
+          )}
           {channel && (
             <Button variant="ghost" size="sm" onClick={close}>
               <X />

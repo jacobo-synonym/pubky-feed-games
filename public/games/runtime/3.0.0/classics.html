@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <link rel="stylesheet" href="classics.css" />
+    <title>Pubky arcade</title>
+  </head>
+  <body>
+    <main>
+      <header><span id="title">Arcade</span><button id="pause" hidden>Pause</button></header>
+      <section id="intro">
+        <p class="eyebrow">A LITTLE PLAY IN YOUR FEED</p>
+        <h1 id="heading">Ready?</h1>
+        <p id="instructions"></p>
+        <button id="start" class="primary">Start game</button
+        ><small>Up to 2 minutes · Keyboard or touch controls</small>
+      </section>
+      <section id="play" hidden>
+        <div class="stats">
+          <span id="score" role="status">0 points</span><span id="detail"></span><span id="time">2:00</span>
+        </div>
+        <div id="stage">
+          <canvas id="board" width="380" height="360" tabindex="0" aria-label="Arcade game board"></canvas>
+        </div>
+        <div id="controls" aria-label="Game controls">
+          <button data-action="left" aria-label="Move left">←</button
+          ><button data-action="up" id="up" aria-label="Move up">↑</button
+          ><button data-action="down" id="down" aria-label="Move down">↓</button
+          ><button data-action="right" aria-label="Move right">→</button
+          ><button data-action="drop" id="drop">Drop</button>
+        </div>
+        <p id="hint"></p>
+      </section>
+      <section id="paused" hidden>
+        <h1>Game paused</h1>
+        <p>Your round will wait.</p>
+        <button id="resume" class="primary">Resume</button>
+      </section>
+    </main>
+    <script src="classics-engine.js"></script>
+    <script src="classics.js"></script>
+  </body>
+</html>

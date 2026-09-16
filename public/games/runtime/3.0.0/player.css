@@ -1,0 +1,183 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  font-family: "Trebuchet MS", sans-serif;
+  background: #c6dfba;
+  color: #24382b;
+}
+button {
+  font: inherit;
+  cursor: pointer;
+  min-height: 44px;
+  border: 0;
+}
+canvas {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+#hud {
+  position: absolute;
+  top: 22px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  justify-content: space-between;
+  font-weight: 800;
+  font-size: 20px;
+  pointer-events: none;
+}
+#intro {
+  position: absolute;
+  inset: 0;
+  padding: 56px 38px;
+  background: linear-gradient(
+    90deg,
+    #c6dfbaef 0%,
+    #c6dfbad9 38%,
+    #c6dfba00 75%
+  );
+}
+h1 {
+  font-size: clamp(40px, 7vw, 68px);
+  letter-spacing: -3px;
+  line-height: 0.95;
+  margin: 23px 0 16px;
+  max-width: 450px;
+}
+p {
+  font-size: 15px;
+  max-width: 240px;
+  line-height: 1.5;
+}
+.pill {
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 1.5px;
+}
+#start,
+#resume {
+  background: #24382b;
+  color: #fff;
+  border-radius: 40px;
+  padding: 14px 25px;
+  margin: 10px 0 14px;
+  font-weight: bold;
+  display: block;
+  min-width: 158px;
+  box-shadow: 0 4px 0 #0002;
+}
+#start span {
+  padding-left: 25px;
+}
+small {
+  font-size: 9px;
+  letter-spacing: 1.5px;
+}
+#jump {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  background: #24382b;
+  color: white;
+  border-radius: 50px;
+  padding: 12px 28px;
+  touch-action: manipulation;
+}
+#controls {
+  position: absolute;
+  bottom: 18px;
+  left: 20px;
+  display: flex;
+  gap: 8px;
+}
+#controls button {
+  border: 1px solid #24382b30;
+  border-radius: 24px;
+  background: #ffffff95;
+  color: #24382b;
+  font-size: 11px;
+  padding: 8px 14px;
+}
+#pause {
+  position: absolute;
+  inset: 0;
+  place-content: center;
+  background: #c6dfbaed;
+  text-align: center;
+}
+#pause:not([hidden]) {
+  display: grid;
+}
+#pause button {
+  margin: auto;
+}
+[hidden] {
+  display: none !important;
+}
+button:focus-visible {
+  outline: 3px solid #fff;
+  outline-offset: 4px;
+}
+@media (max-width: 480px) {
+  #intro {
+    padding: 62px 24px;
+  }
+  h1 {
+    font-size: 48px;
+  }
+  #hud {
+    font-size: 16px;
+    top: 20px;
+  }
+  #intro p {
+    max-width: 180px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    scroll-behavior: auto;
+  }
+}
+body:has(#intro:not([hidden])) #hud {
+  visibility: hidden;
+}
+body:has(#intro:not([hidden])) #controls {
+  top: 12px;
+  bottom: auto;
+  left: auto;
+  right: 14px;
+}
+canvas {
+  object-position: left bottom;
+}
+@media (max-width: 480px) {
+  #intro {
+    padding: 52px 24px;
+  }
+  #intro h1 {
+    font-size: 42px;
+    margin: 18px 0 12px;
+  }
+  #intro p {
+    margin: 8px 0;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  #start {
+    margin: 12px 0 10px;
+    padding: 12px 22px;
+  }
+  #intro small {
+    font-size: 8px;
+  }
+}
+/* Pubky controls and overlays; the illustrated game world retains its colors. */
+body{font-family:system-ui,sans-serif}#intro{background:oklch(.118 .014 284.115 / .94);color:#fff;padding:40px 28px}#intro h1{font-size:clamp(28px,6vw,48px);line-height:1.05;letter-spacing:-1px;margin:16px 0}#intro p,#intro small,.pill{color:#aaaab3}#start,#resume{background:oklch(.928 .23 123.978 / .16);color:oklch(.928 .23 123.978);border:1px solid oklch(.928 .23 123.978);box-shadow:none;min-height:40px;padding:10px 20px}#jump,#controls button{background:#303034;color:#d4d4db;border:1px solid #525252;box-shadow:none;min-height:40px}#pause{background:oklch(.118 .014 284.115 / .96);color:#fff}button:focus-visible{outline-color:oklch(.928 .23 123.978)}@media(max-width:480px){#intro{padding:24px}#intro h1{font-size:30px;margin:12px 0}#intro p{font-size:12px}#start{margin:10px 0}#intro small{letter-spacing:.5px}}

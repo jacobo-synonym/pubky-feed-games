@@ -97,13 +97,13 @@ function GameEditor({
         </DialogHeader>
         {!prepared ? (
           <form onSubmit={submit} className="flex flex-col gap-5" onChange={changed}>
-            <div className="grid grid-cols-3 gap-2" aria-label="Game templates">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3" aria-label="Game templates">
               {ARCADE_GAMES.map((template) => (
                 <button
                   type="button"
                   key={template.kind}
                   aria-pressed={kind === template.kind}
-                  className={`overflow-hidden rounded-xl border text-left transition-colors focus-visible:outline-2 focus-visible:outline-ring ${kind === template.kind ? 'border-brand bg-brand/10' : 'border-border hover:bg-secondary'}`}
+                  className={`overflow-hidden rounded-xl border text-left transition-colors focus-visible:outline-2 focus-visible:outline-ring ${kind === template.kind ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary'}`}
                   onClick={() => {
                     form.setValue('kind', template.kind);
                     form.setValue('title', template.title);

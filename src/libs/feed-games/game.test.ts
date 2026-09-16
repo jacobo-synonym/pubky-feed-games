@@ -9,6 +9,7 @@ import {
   parseGameUrl,
   resultPost,
   SAMPLE_GAME,
+  suggestedGames,
 } from './game';
 
 const origin = 'https://pubky-feed-games.vercel.app';
@@ -44,9 +45,15 @@ describe('Feed Games references', () => {
 });
 
 describe('Arcade v2', () => {
+  it.each(ARCADE_GAMES)('suggests three different games after $kind', (game) => {
+    const suggestions = suggestedGames(game);
+    expect(suggestions).toHaveLength(3);
+    expect(new Set(suggestions.map((item) => item.kind)).size).toBe(3);
+    expect(suggestions.every((item) => item.kind !== game.kind)).toBe(true);
+  });
   it.each(ARCADE_GAMES)('round-trips $kind without external runtimes', (game) => {
     expect(parseGameUrl(gameUrl(game, origin))).toEqual(game);
-    expect(gamePlayer(game)).toMatch(/^\/games\/runtime\/2.0.0\/(player|arcade)\.html$/);
+    expect(gamePlayer(game)).toMatch(/^\/games\/runtime\/3.0.0\/(player|arcade|classics)\.html$/);
   });
   it('preserves legacy rules and rejects invalid legacy kinds', () => {
     expect(gamePlayer(SAMPLE_GAME)).toBe('/games/runtime/1.0.0/player.html');

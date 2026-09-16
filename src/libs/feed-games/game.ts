@@ -2,6 +2,7 @@ import { LinkifyIt } from 'linkify-it';
 import { z } from 'zod';
 import { APP_ROUTES, POST_ROUTES } from '@/app/routes';
 
+export const GAME_KINDS = ['pigeon', 'memory', 'reaction', 'maze', 'blocks', 'breaker', 'snake'] as const;
 export const GAME_CREATE_EVENT = 'pubky:create-game';
 export const GAME_RESULT_EVENT = 'pubky:game-result';
 export const GAME_TAG = 'feed-games';
@@ -9,7 +10,7 @@ export const GAME_PLAY_EVENT = 'pubky:play-game';
 export const postReferenceSchema = z.string().regex(/^[ybndrfg8ejkmcpqxot1uwisza345h769]{52}:[A-Z0-9]{13}$/);
 export const gameSchema = z
   .object({
-    kind: z.enum(['pigeon', 'memory', 'reaction']).default('pigeon'),
+    kind: z.enum(GAME_KINDS).default('pigeon'),
     version: z.union([z.literal(1), z.literal(2)]).default(1),
     pattern: z.enum(['balanced', 'hurdles', 'snacks']).default('balanced'),
     title: z
@@ -40,6 +41,10 @@ export const ARCADE_GAMES: FeedGame[] = [
   { ...SAMPLE_GAME, version: 2 },
   { ...SAMPLE_GAME, version: 2, kind: 'memory', title: 'Pocket Pairs', theme: 'sunset', seed: 719 },
   { ...SAMPLE_GAME, version: 2, kind: 'reaction', title: 'Signal Sprint', theme: 'midnight', seed: 2026 },
+  { ...SAMPLE_GAME, version: 2, kind: 'maze', title: 'Maze Munch', theme: 'midnight', seed: 42 },
+  { ...SAMPLE_GAME, version: 2, kind: 'blocks', title: 'Falling Blocks', theme: 'park', seed: 87 },
+  { ...SAMPLE_GAME, version: 2, kind: 'breaker', title: 'Brick Breaker', theme: 'sunset', seed: 53 },
+  { ...SAMPLE_GAME, version: 2, kind: 'snake', title: 'Snake', theme: 'park', seed: 61 },
 ];
 
 /** Only declarative settings are accepted. A post can never supply executable code or a player URL. */
@@ -58,8 +63,7 @@ export function parseGameUrl(value: string, origin?: string): FeedGame | null {
     )
       return null;
     const q = url.searchParams;
-    if (!['1', '2'].includes(q.get('v') ?? '') || !['pigeon', 'memory', 'reaction'].includes(q.get('game') ?? ''))
-      return null;
+    if (!['1', '2'].includes(q.get('v') ?? '') || !GAME_KINDS.some((kind) => kind === q.get('game'))) return null;
     if (q.get('v') === '1' && (q.get('game') !== 'pigeon' || q.has('pattern'))) return null;
     const keys = ['game', 'v', 'title', 'theme', 'difficulty', 'seed', 'source', 'pattern'];
     for (const key of q.keys()) if (!keys.includes(key) || q.getAll(key).length !== 1) return null;
@@ -106,20 +110,27 @@ export function findGameInContent(content: string, origin?: string): FeedGame | 
 }
 
 export function gameCover(game: FeedGame): string {
+  if (['maze', 'blocks', 'breaker', 'snake'].includes(game.kind)) return `/games/${game.kind}.svg`;
   return `/games/${game.kind === 'pigeon' ? '' : `${game.kind}-`}${game.theme}.svg`;
 }
 export function gamePlayer(game: FeedGame): string {
-  return `/games/runtime/${game.version === 1 ? '1.0.0' : '2.0.0'}/${game.kind === 'pigeon' ? 'player' : 'arcade'}.html`;
+  const player = game.kind === 'pigeon' ? 'player' : ['memory', 'reaction'].includes(game.kind) ? 'arcade' : 'classics';
+  return `/games/runtime/${game.version === 1 ? '1.0.0' : '3.0.0'}/${player}.html`;
 }
 export function gameScore(game: FeedGame, score: number): string {
   return game.kind === 'pigeon' ? `${score} fries` : `${score} points`;
 }
 export function gameDescription(game: FeedGame): string {
-  return game.kind === 'pigeon'
-    ? 'Hop cones. Collect fries. Own the park.'
-    : game.kind === 'memory'
-      ? 'Find every pair. Keep your moves sharp.'
-      : 'Wait for the signal. Make every tap count.';
+  const descriptions: Record<FeedGame['kind'], string> = {
+    pigeon: 'Hop cones. Collect fries. Own the park.',
+    memory: 'Find every pair. Keep your moves sharp.',
+    reaction: 'Wait for the signal. Make every tap count.',
+    maze: 'Collect the dots. Dodge the chasers. Power up and turn the tables.',
+    blocks: 'Rotate, drop, and clear full rows before the stack reaches the top.',
+    breaker: 'Keep the ball in play. Clear the bricks with your paddle.',
+    snake: 'Grab a snack. Grow your snake. Leave yourself a way out.',
+  };
+  return descriptions[game.kind];
 }
 export const resultRequestSchema = z.object({
   game: gameSchema,
@@ -132,3 +143,19 @@ export function resultPost({ game, score }: GameResultRequest, origin: string): 
 }
 
 export type GameEditorRequest = { game: FeedGame; onInsert?: (game: FeedGame) => void };
+
+export function gameLabel(game: FeedGame): string {
+  return {
+    pigeon: '30 seconds',
+    memory: 'Match the pairs',
+    reaction: 'Quick reactions',
+    maze: 'Maze chase',
+    blocks: 'Clear the rows',
+    breaker: 'Break the bricks',
+    snake: 'Eat and grow',
+  }[game.kind];
+}
+export function suggestedGames(game: FeedGame): FeedGame[] {
+  const index = ARCADE_GAMES.findIndex((item) => item.kind === game.kind);
+  return Array.from({ length: 3 }, (_, offset) => ARCADE_GAMES[(index + 1 + offset) % ARCADE_GAMES.length]);
+}

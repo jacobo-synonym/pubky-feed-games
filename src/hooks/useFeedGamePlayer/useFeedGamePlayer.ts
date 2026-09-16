@@ -42,7 +42,8 @@ export function useFeedGamePlayer(game: FeedGame) {
         message.type === 'result' &&
         Number.isInteger(message.result?.score) &&
         message.result.score >= 0 &&
-        message.result.score <= (kind === 'reaction' ? (3 + 2 * difficulty) * 1000 : 1000)
+        message.result.score <=
+          (kind === 'reaction' ? (3 + 2 * difficulty) * 1000 : ['pigeon', 'memory'].includes(kind) ? 1000 : 100000)
       )
         setScore(message.result.score);
     };

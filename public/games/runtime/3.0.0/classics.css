@@ -1,0 +1,152 @@
+/* Pubky tokens mirrored into the opaque game sandbox. */
+:root {
+  --background: oklch(0.118 0.014 284.115);
+  --foreground: #fff;
+  --secondary: #303034;
+  --muted: #89898f;
+  --border: oklch(0.311 0.007 285.98);
+  --brand: oklch(0.928 0.23 123.978);
+}
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+}
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font:
+    14px/1.4 system-ui,
+    sans-serif;
+}
+main {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 12px;
+}
+header,
+.stats {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+header {
+  font-weight: 600;
+  min-height: 32px;
+}
+button {
+  font: inherit;
+  font-weight: 600;
+  min-height: 40px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--secondary);
+  color: var(--foreground);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+button:hover {
+  background: oklch(0.392 0.007 286.088);
+}
+button:focus-visible,
+canvas:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 3px;
+}
+button.primary {
+  background: color-mix(in oklch, var(--brand) 16%, transparent);
+  color: var(--brand);
+  border-color: var(--brand);
+}
+#intro,
+#paused {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 16px;
+}
+h1 {
+  font-size: clamp(26px, 7vw, 42px);
+  line-height: 1.1;
+  margin: 0;
+  letter-spacing: -1px;
+}
+p {
+  margin: 0;
+}
+small,
+.eyebrow,
+#hint {
+  font-size: 11px;
+  color: var(--muted);
+}
+.eyebrow {
+  letter-spacing: 1px;
+}
+#play {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.stats {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+#stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+}
+canvas {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  touch-action: none;
+  border-radius: 8px;
+}
+#controls {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+}
+#controls button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+}
+#hint {
+  text-align: center;
+}
+#pause {
+  min-height: 32px;
+  font-size: 12px;
+  padding: 4px 12px;
+}
+[hidden] {
+  display: none !important;
+}
+@media (max-width: 340px) {
+  main {
+    padding: 12px;
+    gap: 8px;
+  }
+  #controls {
+    gap: 4px;
+  }
+  #hint {
+    font-size: 10px;
+  }
+}

@@ -13,7 +13,7 @@ afterEach(() => {
 });
 function player(kind: 'memory' | 'reaction') {
   vi.useFakeTimers();
-  document.body.innerHTML = readFileSync('public/games/runtime/2.0.0/arcade.html', 'utf8');
+  document.body.innerHTML = readFileSync('public/games/runtime/3.0.0/arcade.html', 'utf8');
   const post = vi.spyOn(window, 'postMessage').mockImplementation(() => {});
   const addWindowListener = window.addEventListener.bind(window);
   const addDocumentListener = document.addEventListener.bind(document);
@@ -34,8 +34,8 @@ function player(kind: 'memory' | 'reaction') {
     clearTimeout,
     ArcadeEngine: {} as { deck: (seed: number, difficulty: number) => number[] },
   };
-  runInNewContext(readFileSync('public/games/runtime/2.0.0/arcade-engine.js', 'utf8'), context);
-  runInNewContext(readFileSync('public/games/runtime/2.0.0/arcade.js', 'utf8'), context);
+  runInNewContext(readFileSync('public/games/runtime/3.0.0/arcade-engine.js', 'utf8'), context);
+  runInNewContext(readFileSync('public/games/runtime/3.0.0/arcade.js', 'utf8'), context);
   window.dispatchEvent(
     new MessageEvent('message', {
       source: window,

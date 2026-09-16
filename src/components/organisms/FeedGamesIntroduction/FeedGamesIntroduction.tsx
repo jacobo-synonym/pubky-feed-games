@@ -1,5 +1,5 @@
 'use client';
-import { useId, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ChevronDown, ChevronUp, Gamepad2, Plus } from 'lucide-react';
@@ -12,8 +12,12 @@ import { PostLinkEmbeds } from '@/molecules/PostLinkEmbeds/PostLinkEmbeds';
 export function FeedGamesIntroduction() {
   const params = useSearchParams();
   const [selected, setSelected] = useState(0);
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(params.get('play') === '1');
   const samplesId = useId();
+  const openSamples = params.get('play') === '1';
+  useEffect(() => {
+    if (openSamples) setExpanded(true);
+  }, [openSamples]);
   const origin = typeof window === 'undefined' ? 'https://pubky-feed-games.vercel.app' : window.location.origin;
   const shared = parseGameUrl(`${origin}${APP_ROUTES.HOME}?${params.toString()}`, origin);
   const gamesView = params.get('view') === 'games';
@@ -26,8 +30,7 @@ export function FeedGamesIntroduction() {
         ) : (
           <Button
             size="sm"
-            variant="ghost"
-            className="text-muted-foreground"
+            variant="secondary"
             aria-expanded={expanded}
             aria-controls={samplesId}
             onClick={() => setExpanded(!expanded)}
@@ -47,7 +50,7 @@ export function FeedGamesIntroduction() {
         <div id={samplesId} className="flex flex-col gap-3 pb-3">
           <p className="text-xs text-muted-foreground">
             {shared
-              ? 'Open the original post to see replies.'
+              ? 'Play this challenge here, or use “Try a game” to browse the collection.'
               : 'Play a sample, then share a challenge for others to play. Samples are not published posts.'}
           </p>
           {!shared && (

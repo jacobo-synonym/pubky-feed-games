@@ -89,6 +89,10 @@ vi.mock('@/config/feed', async (importOriginal) => {
   };
 });
 
+beforeEach(() => {
+  search.value = '';
+});
+
 describe('Home', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -167,6 +171,14 @@ describe('Home - Snapshots', () => {
     expect(screen.queryByRole('button', { name: 'Remix' })).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'Try a game' }));
     expect(screen.queryByRole('button', { name: 'Play in feed' })).toBeNull();
+  });
+
+  it('opens the sample chooser when arriving from a game card', () => {
+    search.value = 'play=1';
+    render(<Home />);
+    expect(screen.getByRole('button', { name: 'Try a game' })).toHaveAttribute('aria-expanded', 'true');
+    expect(screen.getByRole('button', { name: 'Maze Munch' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Falling Blocks' })).toBeInTheDocument();
   });
 
   it('still opens a directly shared game without an extra discovery step', () => {

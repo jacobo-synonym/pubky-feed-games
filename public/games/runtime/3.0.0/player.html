@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+    <link rel="stylesheet" href="./player.css" />
+    <title>Vibes player</title>
+  </head>
+  <body>
+    <canvas
+      id="game"
+      width="720"
+      height="440"
+      aria-label="Pigeon game: press Space or tap Jump to hop over cones and collect fries"
+    ></canvas>
+    <div id="hud">
+      <span id="score">0 fries</span><span id="time">30s</span>
+    </div>
+    <div id="intro">
+      <span class="pill">ONE BUTTON. ONE HUNGRY BIRD.</span>
+      <h1>Lunch is<br />on the run.</h1>
+      <p>Hop over cones. Help yourself to fries.</p>
+      <button id="start">Let's fly <span>↗</span></button
+      ><small>SPACE / ↑ / TAP TO JUMP</small>
+    </div>
+    <div id="pause" hidden>
+      <h2>Take a breather.</h2>
+      <button id="resume">Keep going →</button>
+    </div>
+    <button id="jump" hidden aria-label="Jump">Jump ↑</button>
+    <div id="controls">
+      <button id="sound" aria-label="Turn sound on">Sound off</button
+      ><button id="pause-button" hidden aria-label="Pause game">Ⅱ</button>
+    </div>
+    <script src="./engine.js"></script>
+    <script src="./player.js"></script>
+  </body>
+</html>

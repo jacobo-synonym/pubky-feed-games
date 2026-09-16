@@ -15,6 +15,10 @@ Open https://pubky-feed-games.vercel.app/home. Open **Try a game** to reveal the
 
 - **Pigeon Lunch Run:** hop cones and collect fries; Space, Up, or Jump. A run lasts up to 30 seconds.
 - **Pocket Pairs:** find matching cards in as few moves as possible. Difficulty sets the number of pairs.
+- **Maze Munch:** an original maze chase with dots, power-ups, and pursuing enemies.
+- **Falling Blocks:** rotate and drop pieces, clear rows, and watch the next piece.
+- **Brick Breaker:** a paddle, 40 bricks, and three lives.
+- **Snake:** eat, grow, and avoid the walls and your own tail.
 - **Signal Sprint:** wait for green and tap. Early and missed taps score zero; difficulty sets the number of rounds.
 
 **Create game post** inside the samples opens the creator. Pick a template, title, world, difficulty and course number; runners also have balanced, hurdles and snack trail styles. Shuffle chooses a new course number. Preview before publishing. Existing composers have an **Add game** button: it inserts the configured challenge, preserves the draft and attachments, and does not auto-publish.
@@ -38,7 +42,7 @@ Sign in at https://pubky-feed-games.vercel.app/sign-in using Pubky Ring. Desktop
 
 A normal Pubky text post stores a versioned reference with bounded declarative settings. This client recognizes it and renders a bundled engine inline. No homeserver schema, database version or indexer changes are required. Other Pubky clients show the normal text and link until they adopt a compatible renderer.
 
-The course number, engine version, game kind, theme, difficulty and runner style travel in the reference. Remixes retain a validated source post ID and visible attribution. Post editing can change the reference; there is no immutable revision service. Old version-1 runner posts retain runtime `1.0.0` unchanged. Newly created games and remixes use `2.0.0`.
+The course number, engine version, game kind, theme, difficulty and runner style travel in the reference. Remixes retain a validated source post ID and visible attribution. Post editing can change the reference; there is no immutable revision service. Old version-1 runner posts retain runtime `1.0.0` unchanged. Version-2 references now use presentation runtime `3.0.0`; the original runner, memory, and reaction rules are unchanged. Runtime folders `1.0.0` and `2.0.0` remain untouched. Four new classic arcade kinds use original, seeded engines in `3.0.0`.
 
 ## Isolation and rollback
 
@@ -87,3 +91,13 @@ These are real, publicly indexed staging posts, not only optimistic browser-cach
 ### Discovery simplification (2026-09-15)
 
 Removed Remix actions and creator remix copy, the large Feed Games heading, the arcade slogan and the All posts / Games selector. Samples are closed by default behind **Try a game**; direct shared-game links still open their player preview immediately. **#feed-games** leads to the existing native tag search. This gives an empty feed a small playable starting point while actual game posts, reposts and tags provide ongoing discovery. No additional posts were published for this UI change.
+
+### Expanded arcade (2026-09-16)
+
+- Seven games in the chooser and native composer. New classics support keyboard and touch and cap rounds at two minutes.
+- “Try a game” is now a secondary Home button and a link on game cards, including post details and tag search. `/home?play=1` opens the chooser directly.
+- Results recommend three other games plus the native `#feed-games` search. Suggestions are sample challenges, not fabricated network posts, and never auto-play.
+- Player controls and overlays use Pubky's dark neutrals, rounded controls, and lime action accent. Game artwork can keep its own colors.
+- No new dependencies, Docker, server services, database changes, or Vibes submission.
+
+Verification for this update: 73 targeted tests passed; full suite had 13,514 passes, 2 skips, and one localhost socket test blocked by sandbox `EPERM`. That test file passed all 53 tests when rerun with socket permission. Lint and typecheck passed. Browser checks covered all four new game launches, Falling Blocks results and recommendation navigation, mobile Snake pause/resume and results, mobile maze sizing, and the new-game creator preview. No new network posts were published. The Home visual baseline needs the existing manual VRT workflow refresh.
