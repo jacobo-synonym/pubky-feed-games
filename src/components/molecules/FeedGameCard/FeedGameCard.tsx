@@ -37,6 +37,7 @@ export function FeedGameCard({
         <div className="relative">
           <iframe
             key={channel}
+            hidden={score !== null}
             ref={frameRef}
             title={`${game.title} player`}
             src={gamePlayer(game)}
@@ -60,10 +61,7 @@ export function FeedGameCard({
             </div>
           )}
           {score !== null && (
-            <div
-              className="absolute inset-0 flex flex-col items-center justify-start gap-3 overflow-y-auto bg-background/95 p-4"
-              role="status"
-            >
+            <div className="flex flex-col items-center gap-3 bg-background p-5" role="status">
               <p className="text-3xl font-bold">{gameScore(game, score)}</p>
               <p className="text-sm text-muted-foreground">Casual score · self-reported</p>
               <Button onClick={replay}>

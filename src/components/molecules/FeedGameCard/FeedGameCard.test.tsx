@@ -37,6 +37,7 @@ describe('FeedGameCard', () => {
       );
     }
     expect(screen.getByText('1200 points')).toBeInTheDocument();
+    expect(frame).not.toBeVisible();
     expect(screen.getByRole('link', { name: 'Brick Breaker' })).toHaveAttribute(
       'href',
       expect.stringContaining('game=breaker'),
