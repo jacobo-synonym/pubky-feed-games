@@ -126,3 +126,11 @@ Verification: 115 focused game/navigation tests passed, lint and typecheck passe
 Game cards and completed rounds now offer **Challenge someone**. The action opens the existing native composer with the same course reference and a trailing `@` prompt. Type a name and select a user through Pubky's mention autocomplete, then choose **Post challenge**. Authored games create public replies to their actual post; a shared preview without a parent creates a public root post. Completed rounds include the actual in-memory score, labeled self-reported. No game identity access, new notification service, automatic posts, or multiplayer state is added.
 
 Verification: 307 targeted tests passed, 2 skipped, including native mention helpers, PostInput, challenge schema bounds, score/no-score drafts, exact parent routing, preview exclusion, and sign-in gating. Lint and typecheck passed. No challenges were sent to other people during testing.
+
+### Submission verification (2026-09-16)
+
+The developer confirmed the challenge flow works after testing it. This closes the previously outstanding user acceptance check for mention challenges; the agent did not send those challenges. The implementation remains at `6b2f042`.
+
+The listing credits `jacobo-synonym` with the developer-provided official public key `ssngpfm9x3i8fzp8kp1ipuqdyamhkkka9x9a1g4qd6i4qnsmi7jo`. This author attribution is separate from the staging test identity used for the starter posts. The listing describes all seven games, Games tag discovery, and native mention challenges; removed Remix and Try a game controls are not advertised.
+
+Submission assets and manifest are prepared separately in the Vibes registry. App source remains in the public `jacobo-synonym/pubky-feed-games` fork on `codex/feed-games-arcade`, which is now the fork's default branch. Listing review does not merge this experiment into upstream Pubky.
