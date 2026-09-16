@@ -118,3 +118,5 @@ Published six tagged starter posts through the authenticated UI and reused the e
 | Snake          | `0035Q8CWWE560` |
 
 Author: `xxczmnpzqqz5o3ywmdefcc6f7f3pkg6g4x3hhpgd3wgy11fk5wgo`. No Vibes directory submission. Home/Search visual baselines need the manual **VRT Update Baselines** workflow.
+
+Verification: 115 focused game/navigation tests passed, lint and typecheck passed. Full regression run: 13,511 passed, 2 skipped, with nine Search filter tests failing because their router mock lacked `useRouter`. After updating that mock and the five intentional Games-row snapshots, the Search suite passed 9/9. Browser checks covered desktop selection, returning to All, phone filter availability, seeded posts visible while signed out, and post-based result recommendations.
